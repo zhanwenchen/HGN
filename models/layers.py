@@ -458,36 +458,11 @@ class PredictionLayer(nn.Module):
         self.cache_S = 0
         self.cache_mask = None
 
-    def get_output_mask(self, outer):
-        S = outer.size(1)
-        if S <= self.cache_S:
-            return Variable(self.cache_mask[:S, :S], requires_grad=False)
-        self.cache_S = S
-        np_mask = np.tril(np.triu(np.ones((S, S)), 0), 15)
-        self.cache_mask = outer.data.new(S, S).copy_(torch.from_numpy(np_mask))
-        return Variable(self.cache_mask, requires_grad=False)
+    def forward(self, context_mask, context_input):
+        resid = 1e30 * (1 - context_mask)
 
-    def forward(self, batch, context_input, sent_logits, packing_mask=None, return_yp=False):
-        context_mask = batch['context_mask']
-        context_lens = batch['context_lens']
-        sent_mapping = batch['sent_mapping']
-
-        sp_forward = torch.bmm(sent_mapping, sent_logits).contiguous()  # N x max_seq_len x 1
-
-        start_prediction = self.start_linear(context_input).squeeze(2) - 1e30 * (1 - context_mask)  # N x L
-        end_prediction = self.end_linear(context_input).squeeze(2) - 1e30 * (1 - context_mask)  # N x L
+        start_prediction = self.start_linear(context_input).squeeze(2) - resid  # N x L
+        end_prediction = self.end_linear(context_input).squeeze(2) - resid  # N x L
         type_prediction = self.type_linear(context_input[:, 0, :])
 
-        if not return_yp:
-            return start_prediction, end_prediction, type_prediction
-
-        outer = start_prediction[:, :, None] + end_prediction[:, None]
-        outer_mask = self.get_output_mask(outer)
-        outer = outer - 1e30 * (1 - outer_mask[None].expand_as(outer))
-        if packing_mask is not None:
-            outer = outer - 1e30 * packing_mask[:, :, None]
-        # yp1: start
-        # yp2: end
-        yp1 = outer.max(dim=2)[0].max(dim=1)[1]
-        yp2 = outer.max(dim=1)[0].max(dim=1)[1]
-        return start_prediction, end_prediction, type_prediction, yp1, yp2
+        return start_prediction, end_prediction, type_prediction

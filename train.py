@@ -161,7 +161,7 @@ for epoch in train_iterator:
 
         batch['context_encoding'] = encoder(**inputs)[0]
         batch['context_mask'] = batch['context_mask'].float().to(args.device)
-        start, end, q_type, paras, sents, ents, _, _ = model(batch, return_yp=True)
+        start, end, q_type, paras, sents, ents = model(batch)
 
         loss_list = compute_loss(args, batch, start, end, paras, sents, ents, q_type)
         del batch

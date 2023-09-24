@@ -74,9 +74,5 @@ class HierarchicalGraphNetwork(nn.Module):
         input_state, _ = self.ctx_attention(input_state, graph_state, graph_mask.squeeze(-1))
         predictions = self.predict_layer(batch, input_state, sent_logits[-1], packing_mask=query_mapping, return_yp=return_yp)
 
-        if return_yp:
-            start, end, q_type, yp1, yp2 = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1], yp1, yp2
-        else:
-            start, end, q_type = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1]
+        start, end, q_type = predictions
+        return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1]
