@@ -138,10 +138,9 @@ def default_train_parser():
     parser.add_argument('--fp16',
                         type=boolean_string,
                         default='false',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit")
+                        help="Whether to use 16-bit (mixed) precision instead of 32-bit")
     parser.add_argument('--fp16_opt_level', type=str, default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
+                        help="For fp16: AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3'].")
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="For distributed training: local_rank")
 
