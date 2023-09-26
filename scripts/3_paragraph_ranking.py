@@ -22,7 +22,6 @@ from torch import (
 )
 from torch.cuda import is_available
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
-from apex.amp import initialize
 # This line must be above local package reference
 from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,
                           RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification)
@@ -173,10 +172,9 @@ def set_args():
     parser.add_argument("--task_name", default='hotpotqa', type=str,
                         help="The name of the task to train selected in the list: " + ", ".join(processors.keys()))
     parser.add_argument('--fp16', action='store_true',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit")
+                        help="Whether to use 16-bit (mixed) precision instead of 32-bit")
     parser.add_argument('--fp16_opt_level', type=str, default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
+                        help="For fp16: AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3'].")
     ## Other parameters
     parser.add_argument("--config_name", default="", type=str,
                         help="Pretrained config name or path if not the same as model_name")
@@ -221,8 +219,6 @@ if __name__ == "__main__":
                                         config=config,
                                         state_dict=model_state_dict)
     model.cuda()
-    if args.fp16:
-        model = initialize(model, opt_level=args.fp16_opt_level)
 
     score = evaluate(args, model, tokenizer, prefix="")
 

@@ -13,7 +13,7 @@
     "graphblock_gat": "True",
     "gat_shareweight": "False",
     "n_type": 8,
-    "fp16": "True",
+    "fp16": "False",
     "gnn": "gat:1,2",
     "bi_attn_drop": 0.3,
     "trans_drop": 0.2,
