@@ -94,6 +94,7 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
     answer_dict = {}
     answer_type_dict = {}
     answer_type_prob_dict = {}
+    answer_is_missing_prob_dict = {}
 
     dataloader.refresh()
 
@@ -117,15 +118,18 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
             start, end, q_type, paras, sent, ent, is_missing, yp1, yp2 = model(batch, return_yp=True)
 
         type_prob = F_softmax(q_type, dim=1).data.cpu().numpy()
+        is_missing_prob = torch_sigmoid(is_missing).round().data.cpu().numpy()
         ids = batch['ids']
-        answer_dict_, answer_type_dict_, answer_type_prob_dict_ = convert_to_tokens(example_dict, feature_dict, ids,
+        answer_dict_, answer_type_dict_, answer_type_prob_dict_, answer_is_missing_prob_dict_ = convert_to_tokens(example_dict, feature_dict, ids,
                                                                                     yp1.data.cpu().numpy().tolist(),
                                                                                     yp2.data.cpu().numpy().tolist(),
-                                                                                    type_prob)
+                                                                                    type_prob,
+                                                                                    is_missing_prob)
 
         answer_type_dict.update(answer_type_dict_)
         answer_type_prob_dict.update(answer_type_prob_dict_)
         answer_dict.update(answer_dict_)
+        answer_is_missing_prob_dict.update(answer_is_missing_prob_dict_)
 
         predict_support_np = torch_sigmoid(sent[:, :, 1]).data.cpu().numpy()
 
@@ -161,7 +165,8 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
             prediction = {'answer': ans_dict,
                           'sp': total_sp_dict[thresh_i],
                           'type': answer_type_dict,
-                          'type_prob': answer_type_prob_dict}
+                          'type_prob': answer_type_prob_dict,
+                          'is_missing_prob': answer_is_missing_prob_dict}
             tmp_file = os_path_join(os_path_dirname(pred_file), 'tmp.json')
             with open(tmp_file, 'w') as f:
                 json_dump(prediction, f)
@@ -294,9 +299,10 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     output_text = orig_text[orig_start_position:(orig_end_position + 1)]
     return output_text
 
-def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
+def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob, is_missing_prob):
     answer_dict, answer_type_dict = {}, {}
     answer_type_prob_dict = {}
+    answer_is_missing_prob_dict = {}
 
     q_type = np_argmax(q_type_prob, 1)
 
@@ -343,8 +349,8 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
         answer_dict[qid] = answer_text
         answer_type_prob_dict[qid] = q_type_prob[i].tolist()
         answer_type_dict[qid] = q_type_i.item()
-
-    return answer_dict, answer_type_dict, answer_type_prob_dict
+        answer_is_missing_prob_dict[qid] = is_missing_prob
+    return answer_dict, answer_type_dict, answer_type_prob_dict, answer_is_missing_prob_dict
 
 def count_parameters(model, trainable_only=True, is_dict=False):
     """
