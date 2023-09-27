@@ -138,7 +138,7 @@ scheduler = get_linear_schedule_with_warmup(optimizer,
 # launch training
 ##########################################################################
 global_step = 0
-loss_name = ["loss_total", "loss_span", "loss_type", "loss_sup", "loss_ent", "loss_para"]
+loss_name = ["loss_total", "loss_span", "loss_type", "loss_sup", "loss_ent", "loss_para", "loss_is_missing"]
 tr_loss, logging_loss = [0] * len(loss_name), [0]* len(loss_name)
 main_thread: bool = local_rank in [-1, 0]
 if main_thread:
@@ -170,9 +170,9 @@ for epoch in train_iterator:
         batch['context_encoding'] = encoder(**inputs)[0]
         batch['context_mask'] = context_mask.float().to(device)
         del context_mask
-        start, end, q_type, paras, sents, ents, _, _ = model(batch, return_yp=True)
+        start, end, q_type, paras, sents, ents, is_missing, _, _ = model(batch, return_yp=True)
 
-        loss_list = compute_loss(args, batch, start, end, paras, sents, ents, q_type)
+        loss_list = compute_loss(args, batch, start, end, paras, sents, ents, q_type, is_missing)
         del batch
 
         if n_gpu > 1:

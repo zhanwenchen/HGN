@@ -78,8 +78,8 @@ class HierarchicalGraphNetwork(Module):
         predictions = self.predict_layer(batch, input_state, sent_logits[-1], packing_mask=query_mapping, return_yp=return_yp)
 
         if return_yp:
-            start, end, q_type, yp1, yp2 = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1], yp1, yp2
+            start, end, q_type, is_missing, yp1, yp2 = predictions
+            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1], is_missing, yp1, yp2
         else:
-            start, end, q_type = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1]
+            start, end, q_type, is_missing = predictions
+            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1], is_missing

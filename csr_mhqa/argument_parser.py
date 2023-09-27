@@ -198,6 +198,7 @@ def default_train_parser():
     parser.add_argument("--para_lambda", type=float, default=1)
     parser.add_argument("--sent_lambda", type=float, default=5)
     parser.add_argument("--ent_lambda", type=float, default=1)
+    parser.add_argument("--is_missing_lambda", type=float, default=1)
     parser.add_argument("--sp_threshold", type=float, default=0.5)
 
     return parser

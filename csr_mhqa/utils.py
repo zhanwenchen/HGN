@@ -68,7 +68,7 @@ def get_optimizer(encoder, model, args, learning_rate, remove_pooler=False):
 
     return optimizer
 
-def compute_loss(args, batch, start, end, para, sent, ent, q_type):
+def compute_loss(args, batch, start, end, para, sent, ent, q_type, is_missing):
     criterion = CrossEntropyLoss(reduction='mean', ignore_index=IGNORE_INDEX)
     binary_criterion = BCEWithLogitsLoss(reduction='mean')
     loss_span = args.ans_lambda * (criterion(start, batch['y1']) + criterion(end, batch['y2']))
@@ -81,9 +81,10 @@ def compute_loss(args, batch, start, end, para, sent, ent, q_type):
     loss_ent = args.ent_lambda * criterion(ent, batch['is_gold_ent'].long())
     loss_para = args.para_lambda * criterion(para.view(-1, 2), batch['is_gold_para'].long().view(-1))
 
-    loss = loss_span + loss_type + loss_sup + loss_ent + loss_para
+    loss_is_missing = args.is_missing_lambda * binary_criterion(is_missing, batch['is_missing'])
+    loss = loss_span + loss_type + loss_sup + loss_ent + loss_para + loss_is_missing
 
-    return loss, loss_span, loss_type, loss_sup, loss_ent, loss_para
+    return loss, loss_span, loss_type, loss_sup, loss_ent, loss_para, loss_is_missing
 
 
 def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, prediction_file, eval_file, dev_gold_file):
@@ -113,7 +114,7 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
             batch['context_encoding'] = outputs[0]
             batch['context_mask'] = context_mask.float().to(device)
             del context_mask
-            start, end, q_type, paras, sent, ent, yp1, yp2 = model(batch, return_yp=True)
+            start, end, q_type, paras, sent, ent, is_missing, yp1, yp2 = model(batch, return_yp=True)
 
         type_prob = F_softmax(q_type, dim=1).data.cpu().numpy()
         ids = batch['ids']

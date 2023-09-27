@@ -491,6 +491,7 @@ class PredictionLayer(Module):
         self.start_linear = OutputLayer(input_dim, config, num_answer=1)
         self.end_linear = OutputLayer(input_dim, config, num_answer=1)
         self.type_linear = OutputLayer(input_dim, config, num_answer=4)
+        self.is_missing_linear = OutputLayer(input_dim, config, num_answer=1)
 
         self.cache_S = 0
         self.cache_mask = None
@@ -510,9 +511,10 @@ class PredictionLayer(Module):
         start_prediction = self.start_linear(context_input).squeeze(2) - inverse_context_mask  # N x L
         end_prediction = self.end_linear(context_input).squeeze(2) - inverse_context_mask  # N x L
         type_prediction = self.type_linear(context_input[:, 0, :])
+        is_missing_prediction = self.is_missing_linear(context_input[:, 0, :])
 
         if not return_yp:
-            return start_prediction, end_prediction, type_prediction
+            return start_prediction, end_prediction, type_prediction, is_missing_prediction
 
         outer = start_prediction[:, :, None] + end_prediction[:, None]
         outer_mask = self.get_output_mask(outer)
@@ -523,4 +525,4 @@ class PredictionLayer(Module):
         # yp2: end
         yp1 = outer.max(dim=2)[0].max(dim=1)[1]
         yp2 = outer.max(dim=1)[0].max(dim=1)[1]
-        return start_prediction, end_prediction, type_prediction, yp1, yp2
+        return start_prediction, end_prediction, type_prediction, is_missing_prediction, yp1, yp2
