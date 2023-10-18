@@ -89,9 +89,11 @@ def extract_context_ner(full_data, ner_data=None):
 
     return context_guid2ner
 
-data = json_load(open(input_file, 'r'))
+with open(input_file, 'r') as file_in:
+    data = json_load(file_in)
 # ner_data is from spacy which has been extracted in 0_build_db.py
-ner_data = json_load(open(ner_file, 'r'))
+with open(ner_file, 'r') as file_in:
+    ner_data = json_load(file_in)
 ques_guid2ner = extract_question_ner(data)
 context_guid2ner = extract_context_ner(data, ner_data)
 
@@ -115,4 +117,5 @@ for case in data:
     output_data[guid]['question'] = ques_ent_1 + ques_ent_2
     output_data[guid]['context'] = context_ners
 
-json_dump(output_data, open(output_file, 'w'))
+with open(output_file, 'w') as file_out:
+    json_dump(output_data, file_out)

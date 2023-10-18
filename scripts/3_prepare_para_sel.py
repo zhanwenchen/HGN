@@ -5,7 +5,8 @@ from pandas import DataFrame
 input_file = argv[1]
 output_file = argv[2]
 
-input_data = json_load(open(input_file, 'r'))
+with open(input_file, 'r') as file_in:
+    input_data = json_load(file_in)
 labels, titles, contexts, questions = [], [], [], []
 
 for data in input_data:

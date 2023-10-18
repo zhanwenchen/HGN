@@ -23,7 +23,8 @@ def boolean_string(s):
     return s_lower == 'true'
 
 def json_to_argv(json_file):
-    j = json_load(open(json_file))
+    with open(json_file, mode='r') as file_in:
+        j = json_load(file_in)
     argv = []
     for k, v in j.items():
         new_v = str(v) if v is not None else None

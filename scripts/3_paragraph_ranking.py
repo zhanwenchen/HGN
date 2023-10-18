@@ -219,6 +219,8 @@ if __name__ == "__main__":
     score = evaluate(args, model, tokenizer, prefix="")
 
     # load source data
-    source_data = json_load(open(args.raw_data, 'r'))
+    with open(args.raw_data, 'r') as file_in:
+        source_data = json_load(file_in)
     rank_paras_dict = rank_paras(source_data, score)
-    json_dump(rank_paras_dict, open(os_path_join(args.data_dir, 'para_ranking.json'), 'w'))
+    with open(os_path_join(args.data_dir, 'para_ranking.json'), 'w') as file_out:
+        json_dump(rank_paras_dict, file_out)

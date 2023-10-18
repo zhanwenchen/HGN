@@ -98,7 +98,8 @@ for doc_id in doc_ids:
         title_to_id[title] = doc_id
 
 # 2. extract hyperlink and NER
-input_data = json_load(open(input_file, 'r'))
+with open(input_file, 'r') as file_in:
+    input_data = json_load(file_in)
 output_data = {}
 for data in input_data:
     context = dict(data['context'])
@@ -133,4 +134,5 @@ for data in input_data:
                                   'hyperlink_spans': hyperlink_spans,
                                   'text_ner': text_ner}
 
-json_dump(output_data, open(output_file, 'w'))
+with open(output_file, 'w') as file_out:
+    json_dump(output_data, file_out)

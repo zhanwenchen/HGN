@@ -7,10 +7,14 @@ from torch import tensor as torch_tensor, from_numpy as torch_from_numpy, matmul
 
 assert len(argv) == 6
 
-raw_data = json_load(open(argv[1], 'r'))
-doc_link_data = json_load(open(argv[2], 'r'))
-ent_data = json_load(open(argv[3], 'r'))
-para_data = json_load(open(argv[4], 'r'))
+with open(argv[1], 'r') as file_in:
+    raw_data = json_load(file_in)
+with open(argv[2], 'r') as file_in:
+    doc_link_data = json_load(file_in)
+with open(argv[3], 'r') as file_in:
+    ent_data = json_load(file_in)
+with open(argv[4], 'r') as file_in:
+    para_data = json_load(file_in)
 output_file = argv[5]
 
 def select_titles(question_text, question_entities):
@@ -194,4 +198,5 @@ for case in tqdm(raw_data):
     selected_para_dict[guid].append(other_titles)
     para_num.append(sum(sel_para_idx))
 
-json_dump(selected_para_dict, open(output_file, 'w'))
+with open(output_file, 'w') as file_out:
+    json_dump(selected_para_dict, file_out)

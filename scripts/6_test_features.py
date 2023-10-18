@@ -85,7 +85,8 @@ def predict(examples, features, pred_file, tokenizer, use_ent_ans=False):
         sp_dict[qid] = cur_sp
 
     final_pred = {'answer': answer_dict, 'sp': sp_dict}
-    json.dump(final_pred, open(pred_file, 'w'))
+    with open(pred_file, 'w') as file_out:
+        json.dump(final_pred, file_out)
 
     print("Maximum sentence num: {}".format(max_sent_num))
     print("Maximum entity num: {}".format(max_entity_num))
@@ -125,9 +126,12 @@ if __name__ == '__main__':
     cached_graphs_file = os.path.join(args.input_dir, 
                                      get_cached_filename('graphs', args))
 
-    examples = pickle.load(gzip.open(cached_examples_file, 'rb'))
-    features = pickle.load(gzip.open(cached_features_file, 'rb'))
-    graph_dict = pickle.load(gzip.open(cached_graphs_file, 'rb'))
+    with gzip.open(cached_examples_file, 'rb') as file_in:
+        examples = pickle.load(file_in)
+    with gzip.open(cached_features_file, 'rb') as file_in:
+        features = pickle.load(file_in)
+    with gzip.open(cached_graphs_file, 'rb') as file_in:
+        graph_dict = pickle.load(file_in)
 
     example_dict = { example.qas_id: example for example in examples}
     feature_dict = { feature.qas_id: feature for feature in features}
