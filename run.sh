@@ -19,6 +19,10 @@ mkdir -p $DATA_ROOT/models/pretrained_cache
 
 # 0. Build Database from Wikipedia
 download() {
+    echo "run.sh=>download() Downloading HotpotQA data files and finetuned models..."
+    bash scripts/download_data.sh
+    echo "run.sh=>download() Finished downloading HotpotQA data files and finetuned models!"
+
     [[ -d $DATA_ROOT ]] || mkdir -p $DATA_ROOT/dataset/data_raw; mkdir -p $DATA_ROOT/knowledge
 
     wget -P $DATA_ROOT/dataset/data_raw/ http://curtis.ml.cmu.edu/datasets/hotpot/hotpot_train_v1.1.json
