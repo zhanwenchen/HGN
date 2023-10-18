@@ -36,10 +36,10 @@ MODEL_CLASSES = {
 
 logger = getLogger(__name__)
 
-def evaluate(args, model, tokenizer, prefix=""):
+def evaluate(args, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_task = args.task_name
-    eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, evaluate=True)
+    eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, device, evaluate=True)
 
     args.eval_batch_size = args.per_gpu_eval_batch_size
     # Note that DistributedSampler samples randomly
@@ -125,7 +125,7 @@ def rank_paras(data, pred_score):
 
     return ranked_paras
 
-def load_and_cache_examples(args, task, tokenizer, evaluate=False):
+def load_and_cache_examples(args, task, tokenizer, device, evaluate=False):
     processor = processors[task]()
     output_mode = output_modes[task]
 
@@ -141,13 +141,13 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
             pad_token_segment_id=4 if args.model_type in ['xlnet'] else 0)
 
     # Convert to Tensors and build dataset
-    all_input_ids = torch_tensor([f.input_ids for f in features], dtype=torch_long)
-    all_input_mask = torch_tensor([f.input_mask for f in features], dtype=torch_long)
-    all_segment_ids = torch_tensor([f.segment_ids for f in features], dtype=torch_long)
+    all_input_ids = torch_tensor([f.input_ids for f in features], dtype=torch_long, device=device)
+    all_input_mask = torch_tensor([f.input_mask for f in features], dtype=torch_long, device=device)
+    all_segment_ids = torch_tensor([f.segment_ids for f in features], dtype=torch_long, device=device)
     if output_mode == "classification":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_long)
+        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_long, device=device)
     elif output_mode == "regression":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_float)
+        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_float, device=device)
 
     dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
@@ -216,7 +216,7 @@ if __name__ == "__main__":
                                         config=config,
                                         state_dict=model_state_dict,
                                         device_map=args.device)
-    score = evaluate(args, model, tokenizer, prefix="")
+    score = evaluate(args, model, tokenizer, args.device, prefix="")
 
     # load source data
     with open(args.raw_data, 'r') as file_in:
