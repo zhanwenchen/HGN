@@ -135,13 +135,6 @@ def default_train_parser():
                         type=boolean_string,
                         help="use data parallel or not")
     parser.add_argument("--gpu_id", default=None, type=str, help="GPU id")
-    parser.add_argument('--fp16',
-                        type=boolean_string,
-                        default='false',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit")
-    parser.add_argument('--fp16_opt_level', type=str, default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="For distributed training: local_rank")
 

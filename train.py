@@ -11,7 +11,6 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.distributed import get_rank
 from torch.nn.utils import clip_grad_norm_
 from transformers import get_linear_schedule_with_warmup
-from apex.amp import initialize, scale_loss, master_params
 from csr_mhqa.argument_parser import default_train_parser, complete_default_train_parser, json_to_argv
 from csr_mhqa.data_processing import DataHelper
 from csr_mhqa.utils import load_encoder_model, get_optimizer, compute_loss, eval_model, MODEL_CLASSES
@@ -118,13 +117,8 @@ else:
     t_total: int = len(train_dataloader) // gradient_accumulation_steps * num_train_epochs
 
 optimizer = get_optimizer(encoder, model, args, learning_rate, remove_pooler=False)
-fp16: bool = args.fp16
-if fp16:
-    models, optimizer = initialize([encoder, model], optimizer, opt_level=args.fp16_opt_level)
-    assert len(models) == 2
-    encoder, model = models
 
-# Distributed training (should be after apex fp16 initialization)
+# Distributed training
 local_rank: int = args.local_rank
 if local_rank != -1:
     encoder = DistributedDataParallel(encoder, device_ids=[local_rank], output_device=local_rank, find_unused_parameters=True)
@@ -181,14 +175,9 @@ for epoch in train_iterator:
         if gradient_accumulation_steps > 1:
             for loss in loss_list:
                 loss = loss / gradient_accumulation_steps
-        if fp16:
-            with scale_loss(loss_list[0], optimizer) as scaled_loss:
-                scaled_loss.backward()
-            clip_grad_norm_(master_params(optimizer), max_grad_norm)
-        else:
-            loss_list[0].backward()
-            clip_grad_norm_(encoder.parameters(), max_grad_norm)
-            clip_grad_norm_(model.parameters(), max_grad_norm)
+        loss_list[0].backward()
+        clip_grad_norm_(encoder.parameters(), max_grad_norm)
+        clip_grad_norm_(model.parameters(), max_grad_norm)
 
         for idx in range(len(loss_name)):
             loss_item = loss_list[idx]

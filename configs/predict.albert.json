@@ -3,7 +3,6 @@
     "exp_name": "albert",
     "model_type": "albert",
     "encoder_name_or_path": "albert-xxlarge-v2",
-    "fp16": "True",
     "bi_attn_drop": 0.1,
     "trans_drop": 0.2
 }
