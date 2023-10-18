@@ -4,38 +4,54 @@ This is the official repository of [HGN](https://arxiv.org/abs/1911.03631) (EMNL
 
 ## Requirements
 
+### Option 1: Docker
 We provide Docker image for easier reproduction. Please use `Dockerfile` or pull image directly.
 ```bash
-docker pull studyfang/hgn:latest
+docker run --shm-size=512m --gpus all -p 52022:22 --name hgn -v ${HOME}:${HOME} -it studyfang/hgn:latest
 ```
 
-To run docker without sudo permission, please refer this documentation [Manage Docker as a non-root user](https://docs.docker.com/install/linux/linux-postinstall/).
-Then, you could start docker, e.g.
+### Option 2: Local Conda
+
+#### 2A. For Ubuntu with CUDA support
 ```bash
-docker run --shm-size=512m --gpus all -p 52022:22 --name zhanwen_hgn -v /home/zhanwen:/home/zhanwen -it studyfang/hgn:latest bash
-conda install pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=11.0 -c pytorch
-pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn
+conda create -n hgn python=3.11
+conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers 'spacy[cuda12x]'
+python -m spacy download en_core_web_lg
+```
+
+#### 2B. For MacOS without CUDA but possibly with MPS support:
+```bash
+conda create -n hgn python=3.11
+conda install pytorch::pytorch torchvision torchaudio -c pytorch
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers 'spacy[apple]'
 python -m spacy download en_core_web_lg
 ```
 
 ## Quick Start
 
-*NOTE*: Please make sure you have set up the environment correctly. 
+### 1. Download
+Please set `DATA_ROOT` in preprocess.sh for your usage, otherwise data will be downloaded to the currect directory.
 
-1. Download raw data and our preprocessed data. 
+To download and preprocess the data, please run
 ```bash
-bash scripts/download_data.sh
+bash run.sh download
 ```
 
-2. Inference
-
-We provide roberta-large and albert-xxlarge-v2 finetuned model for inference directly.
-Please run
+### 2. Preprocess
+After you download the data, you could also optionally to preprocess the data only:
+```bash
+bash run.sh preprocess
 ```
+
+### 3. Inference
+We provide `roberta-large` and `albert-xxlarge-v2` finetuned model for inference directly. Please run
+```bash
 python predict.py --config_file configs/predict.roberta.json
+python predict.py --config_file configs/predict.albert.json
 ```
 
-You may get the following results on the dev set with RoBERTa-large model and ALBERT model respectively:
+You may get the following results on the dev set with `RoBERTa-large` model and `ALBERT` model respectively:
 ```
 em = 0.6895340985820392
 f1 = 0.8220366071156804
@@ -54,29 +70,14 @@ joint_em = 0.4700877785280216
 joint_f1 = 0.7573679775376975
 ```
 
-Please refer to Preprocess and training section if you want to reproduce other steps.
-
-## Preprocess
-
-Please set DATA_ROOT in preprocess.sh for your usage, otherwise data will be downloaded to the currect directory.
-
-To download and preprocess the data, please run
-```bash
-bash run.sh download,preprocess
-```
-
-After you download the data, you could also optionally to preprocess the data only:
-```bash
-bash run.sh preprocess
-```
-
-## Training
+### 4. Training
 
 Please set your home data folder `HOME_DATA_FOLDER` in envs.py.
 
 And then run
-```
+```bash
 python train.py --config_file configs/train.roberta.json
+python train.py --config_file configs/train.albert.json
 ```
 
 ## Contributing
