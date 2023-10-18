@@ -21,12 +21,12 @@ from csr_mhqa.data_processing import IGNORE_INDEX
 
 logger = getLogger(__name__)
 
-def load_encoder_model(encoder_name_or_path, model_type):
+def load_encoder_model(encoder_name_or_path, model_type, device):
     if encoder_name_or_path in [None, 'None', 'none']:
         raise ValueError('no checkpoint provided for model!')
 
     config_class, model_encoder, tokenizer_class = MODEL_CLASSES[model_type]
-    config = config_class.from_pretrained(encoder_name_or_path)
+    config = config_class.from_pretrained(encoder_name_or_path, device_map=device)
     if config is None:
         raise ValueError(f'config.json is not found at {encoder_name_or_path}')
 
@@ -36,9 +36,9 @@ def load_encoder_model(encoder_name_or_path, model_type):
             encoder_file = os_path_join(encoder_name_or_path, 'pytorch_model.bin')
         else:
             encoder_file = os_path_join(encoder_name_or_path, 'encoder.pkl')
-        encoder = model_encoder.from_pretrained(encoder_file, config=config)
+        encoder = model_encoder.from_pretrained(encoder_file, config=config, device_map=device)
     else:
-        encoder = model_encoder.from_pretrained(encoder_name_or_path, config=config)
+        encoder = model_encoder.from_pretrained(encoder_name_or_path, config=config, device_map=device)
 
     return encoder, config
 

@@ -72,23 +72,24 @@ else:
     learning_rate = args.learning_rate
 
 # Set Encoder and Model
+device = args.device
 model_type: str = args.model_type
 encoder_name_or_path: str = args.encoder_name_or_path
-encoder, _ = load_encoder_model(encoder_name_or_path, model_type)
+encoder, _ = load_encoder_model(encoder_name_or_path, model_type, device)
 model = HierarchicalGraphNetwork(config=args)
 
 if encoder_path is not None:
-    encoder.load_state_dict(torch_load(encoder_path))
+    encoder.load_state_dict(torch_load(encoder_path, map_location=device))
 if model_path is not None:
-    model.load_state_dict(torch_load(model_path))
+    model.load_state_dict(torch_load(model_path, map_location=device))
 
-device = args.device
 encoder.to(device)
 model.to(device)
 
 _, _, tokenizer_class = MODEL_CLASSES[model_type]
 tokenizer = tokenizer_class.from_pretrained(encoder_name_or_path,
-                                            do_lower_case=args.do_lower_case)
+                                            do_lower_case=args.do_lower_case,
+                                            device_map=device)
 
 #########################################################################
 # Evalaute if resumed from other checkpoint

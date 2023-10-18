@@ -47,10 +47,11 @@ dev_dataloader = helper.dev_loader
 #########################################################################
 # Initialize Model
 ##########################################################################
+device = args.device
 model_type: str = args.model_type
 encoder_name_or_path: str = args.encoder_name_or_path
 config_class, model_encoder, tokenizer_class = MODEL_CLASSES[model_type]
-config = config_class.from_pretrained(encoder_name_or_path)
+config = config_class.from_pretrained(encoder_name_or_path, device_map=device)
 
 exp_name: str = args.exp_name
 encoder_path: str = os_path_join(exp_name, 'encoder.pkl')
@@ -58,17 +59,13 @@ model_path: str = os_path_join(exp_name, 'model.pkl')
 logger.info("Loading encoder from: {}".format(encoder_path))
 logger.info("Loading model from: {}".format(model_path))
 
-encoder, _ = load_encoder_model(encoder_name_or_path, model_type)
+encoder, _ = load_encoder_model(encoder_name_or_path, model_type, device)
 model = HierarchicalGraphNetwork(config=args)
 
 if encoder_path is not None:
-    encoder.load_state_dict(torch_load(encoder_path))
+    encoder.load_state_dict(torch_load(encoder_path, map_location=device))
 if model_path is not None:
-    model.load_state_dict(torch_load(model_path))
-
-device = args.device
-encoder.to(device)
-model.to(device)
+    model.load_state_dict(torch_load(model_path, map_location=device))
 
 encoder.eval()
 model.eval()

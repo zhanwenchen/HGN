@@ -205,17 +205,17 @@ if __name__ == "__main__":
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           num_labels=num_labels,
-                                          finetuning_task=args.task_name)
+                                          finetuning_task=args.task_name,
+                                          device_map=args.device)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
-                                                do_lower_case=args.do_lower_case)
+                                                do_lower_case=args.do_lower_case, device_map=args.device)
 
     # Load a trained model that you have fine-tuned
-    model_state_dict = torch_load(args.eval_ckpt)
+    model_state_dict = torch_load(args.eval_ckpt, map_location=args.device)
     model = model_class.from_pretrained(args.model_name_or_path,
                                         config=config,
-                                        state_dict=model_state_dict)
-    model.cuda()
-
+                                        state_dict=model_state_dict,
+                                        device_map=args.device)
     score = evaluate(args, model, tokenizer, prefix="")
 
     # load source data

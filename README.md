@@ -15,16 +15,18 @@ docker run --shm-size=512m --gpus all -p 52022:22 --name hgn -v ${HOME}:${HOME} 
 #### 2A. For Ubuntu with CUDA support
 ```bash
 conda create -n hgn python=3.11
+conda activate hgn
 conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
-pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers 'spacy[cuda12x]'
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy[cuda12x]'
 python -m spacy download en_core_web_lg
 ```
 
 #### 2B. For MacOS without CUDA but possibly with MPS support:
 ```bash
 conda create -n hgn python=3.11
+conda activate hgn
 conda install pytorch::pytorch torchvision torchaudio -c pytorch
-pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers 'spacy[apple]'
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy[apple]'
 python -m spacy download en_core_web_lg
 ```
 
