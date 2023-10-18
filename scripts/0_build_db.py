@@ -6,6 +6,7 @@
 # LICENSE file in the root directory of this source tree.
 """A script to read in and store documents in a sqlite database."""
 
+from unicodedata import normalize as unicodedata_normalize
 from argparse import ArgumentParser
 from json import loads as json_loads
 from os import walk as os_walk
@@ -18,7 +19,6 @@ from sqlite3 import connect as sqlite3_connect
 from tqdm import tqdm
 from pickle import dumps as pickle_dumps
 from spacy import load as spacy_load
-from drqa.retriever.utils import normalize
 
 logger = getLogger()
 logger.setLevel(INFO)
@@ -90,7 +90,7 @@ def get_contents(filename):
                 _text_ner.append(ent_list)
             _text_ner_str = pickle_dumps(_text_ner)
 
-            documents.append((normalize(doc['id']), doc['url'], doc['title'], _text, _text_with_links, _text_ner_str, len(doc['text'])))
+            documents.append((unicodedata_normalize('NFD', doc['id']), doc['url'], doc['title'], _text, _text_with_links, _text_ner_str, len(doc['text'])))
 
     return documents
 
