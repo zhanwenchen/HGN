@@ -13,11 +13,14 @@ docker run --shm-size=512m --gpus all -p 52022:22 --name hgn -v ${HOME}:${HOME} 
 ### Option 2: Local Conda
 
 #### 2A. For Ubuntu with CUDA support
+##### NOTE: Need spacy <3 because otherwise we get
+```/spacy/pipeline/lemmatizer.py:211: UserWarning: [W108] The rule-based lemmatizer did not find POS annotation for one or more tokens. Check that your pipeline includes components that assign token.pos, typically 'tagger'+'attribute_ruler' or 'morphologizer'.```
+
 ```bash
 conda create -n hgn python=3.11
 conda activate hgn
 conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
-pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy[cuda12x]'
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy<3' #
 python -m spacy download en_core_web_lg
 ```
 
@@ -26,7 +29,7 @@ python -m spacy download en_core_web_lg
 conda create -n hgn python=3.11
 conda activate hgn
 conda install pytorch::pytorch torchvision torchaudio -c pytorch
-pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy[apple]'
+pip install tensorboardX boto3 sentencepiece sacremoses ujson scikit-learn datasets ujson transformers accelerate 'spacy<3'
 python -m spacy download en_core_web_lg
 ```
 
