@@ -312,7 +312,6 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob, is_missing_p
         example = examples[qid]
 
         tok_to_orig_map = feature.token_to_orig_map
-        orig_all_tokens = example.question_tokens + example.doc_tokens
 
         final_text = " "
         len_tok_to_orig_map: int = len(tok_to_orig_map)
@@ -328,15 +327,11 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob, is_missing_p
             else:
                 orig_tok_start -= ques_tok_len
                 orig_tok_end -= ques_tok_len
-                ctx_start_idx = example.ctx_word_to_char_idx[orig_tok_start]
-                ctx_end_idx = example.ctx_word_to_char_idx[orig_tok_end] + len(example.doc_tokens[orig_tok_end])
                 final_text = example.ctx_text[example.ctx_word_to_char_idx[orig_tok_start]:example.ctx_word_to_char_idx[orig_tok_end]+len(example.doc_tokens[orig_tok_end])]
 
         return final_text
 
     for i, qid in enumerate(ids):
-        feature = features[qid]
-        answer_text = ''
         q_type_i = q_type[i]
         if q_type_i in [0, 3]:
             answer_text = get_ans_from_pos(qid, y1[i], y2[i])

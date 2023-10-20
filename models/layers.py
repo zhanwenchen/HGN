@@ -143,9 +143,6 @@ class GATSelfAttention(Module):
         self.act = get_act('lrelu:0.2')
 
     def forward(self, input_state, adj, node_mask=None, query_vec=None):
-        size = adj.size()
-        dtype = adj.dtype
-        device = adj.device
         zero_vec = torch_zeros_like(adj)
         scores = torch_zeros_like(adj)
         dropout = self.dropout
@@ -265,15 +262,10 @@ class GraphBlock(Module):
             self.entity_mlp = OutputLayer(hidden_dim*2, config, num_answer=1)
 
     def forward(self, batch, input_state, query_vec):
-        context_lens = batch['context_lens']
-        context_mask = batch['context_mask']
-        sent_mapping = batch['sent_mapping']
         sent_start_mapping = batch['sent_start_mapping']
         sent_end_mapping = batch['sent_end_mapping']
-        para_mapping = batch['para_mapping']
         para_start_mapping = batch['para_start_mapping']
         para_end_mapping = batch['para_end_mapping']
-        ent_mapping = batch['ent_mapping']
         ent_start_mapping = batch['ent_start_mapping']
         ent_end_mapping = batch['ent_end_mapping']
 
@@ -295,7 +287,6 @@ class GraphBlock(Module):
 
         N, max_para_num, _ = para_state.size()
         _, max_sent_num, _ = sent_state.size()
-        _, max_ent_num, _ = ent_state.size()
 
         if self.q_update:
             graph_state = self.gat_linear(torch_cat([para_state, sent_state, ent_state], dim=1)) # N * (max_para + max_sent + max_ent) * d
@@ -348,8 +339,6 @@ class GatedAttention(Module):
         :param mask: query_mask N * Lm
         :return:
         """
-        bsz, input_len, memory_len = input.size(0), input.size(1), memory.size(1)
-
         input_dot = F_relu(self.input_linear_1(input))  # N x Ld x d
         memory_dot = F_relu(self.memory_linear_1(memory))  # N x Lm x d
 
@@ -446,7 +435,7 @@ class LSTMWrapper(Module):
 
     def forward(self, input, input_lengths=None):
         # input_length must be in decreasing order
-        bsz, slen = input.size(0), input.size(1)
+        slen = input.size(1)
         output = input
         outputs = []
 
