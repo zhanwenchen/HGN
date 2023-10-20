@@ -84,19 +84,17 @@ def update_sp(metrics, prediction, gold):
 
 def update_is_missing(metrics, prediction, gold):
     assert isinstance(prediction, int)
-    tp, fn, tn, fp = 0, 0, 0, 0
-    if gold == 1 and prediction == 1:    # TP
-        tp += 1
-    elif gold == 1 and prediction == 0:   # FP
-        fn += 1
-    elif gold == 0 and prediction == 0:   # TN
-        tn += 1
-    elif gold == 0 and prediction == 1:  # FN
-        fp += 1
-    metrics['is_missing_tp'] += tp
-    metrics['is_missing_fn'] += fn
-    metrics['is_missing_tn'] += tn
-    metrics['is_missing_fp'] += fp
+    match (gold, prediction):
+        case (1, 1): # TP
+            metrics['is_missing_tp'] += 1
+        case (1, 0): # FN
+            metrics['is_missing_fn'] += 1
+        case (0, 0): # TN
+            metrics['is_missing_tn'] += 1
+        case (0, 1): # FP
+            metrics['is_missing_fp'] += 1
+        case _:
+            raise ValueError(f'update_is_missing: (gold, prediction) = {(gold, prediction)}')
 
 def eval(prediction_file, gold_file):
     with open(prediction_file) as f:
