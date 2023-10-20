@@ -3,7 +3,7 @@ from json import load as json_load, dump as json_dump
 from re import sub as re_sub
 from tqdm import tqdm
 from numpy import zeros as np_zeros, float32 as np_float32
-from torch import tensor as torch_tensor, from_numpy as torch_from_numpy, matmul as torch_matmul
+from torch import as_tensor as torch_as_tensor
 
 assert len(argv) == 6
 
@@ -156,7 +156,7 @@ for case in tqdm(raw_data):
 
     if sum(sel_para_idx) == 1:
         next_titles = []
-        next_vec = bfs_step(torch_tensor(sel_para_idx), torch_from_numpy(para_adj))
+        next_vec = bfs_step(torch_as_tensor(sel_para_idx), torch_as_tensor(para_adj))
         next_vec_list = next_vec.nonzero().squeeze(1).numpy().tolist()
         for sent_id in next_vec_list:
             next_titles.append(id_to_title[sent_id])

@@ -14,9 +14,9 @@ from numpy import (
 from pandas import DataFrame
 from torch import (
     no_grad as torch_no_grad,
-    tensor as torch_tensor,
-    long as torch_long,
-    float as torch_float,
+    as_tensor as torch_as_tensor,
+    int64 as torch_int64,
+    float32 as torch_float32,
     load as torch_load,
     device as torch_device,
 )
@@ -144,13 +144,13 @@ def load_and_cache_examples(args, task, tokenizer, device, evaluate=False):
             pad_token_segment_id=4 if args.model_type in ['xlnet'] else 0)
 
     # Convert to Tensors and build dataset
-    all_input_ids = torch_tensor([f.input_ids for f in features], dtype=torch_long, device=device)
-    all_input_mask = torch_tensor([f.input_mask for f in features], dtype=torch_long, device=device)
-    all_segment_ids = torch_tensor([f.segment_ids for f in features], dtype=torch_long, device=device)
+    all_input_ids = torch_as_tensor([f.input_ids for f in features], dtype=torch_int64, device=device)
+    all_input_mask = torch_as_tensor([f.input_mask for f in features], dtype=torch_int64, device=device)
+    all_segment_ids = torch_as_tensor([f.segment_ids for f in features], dtype=torch_int64, device=device)
     if output_mode == "classification":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_long, device=device)
+        all_label_ids = torch_as_tensor([f.label_id for f in features], dtype=torch_int64, device=device)
     elif output_mode == "regression":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_float, device=device)
+        all_label_ids = torch_as_tensor([f.label_id for f in features], dtype=torch_float32, device=device)
 
     dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
