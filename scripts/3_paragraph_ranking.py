@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from logging import getLogger
 from json import load as json_load, dump as json_dump
 from os.path import join as os_path_join
-from tqdm import tqdm
+from sys import stdout as sys_stdout
 from numpy import (
     append as np_append,
     argmax as np_argmax,
@@ -11,6 +11,7 @@ from numpy import (
     exp as np_exp,
     array as np_array,
 )
+from tqdm import tqdm
 from pandas import DataFrame
 from torch import (
     no_grad as torch_no_grad,
@@ -42,15 +43,16 @@ def evaluate(args, model, tokenizer, device, prefix=""):
     eval_task = args.task_name
     eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, device, evaluate=True)
 
-    args.eval_batch_size = args.per_gpu_eval_batch_size
+    eval_batch_size = args.per_gpu_eval_batch_size
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset)
     eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
 
     # Eval!
+    len_eval_dataset = len(eval_dataset)
     print("***** Running evaluation {} *****".format(prefix))
-    print("  Num examples = %d" % len(eval_dataset))
-    print("  Batch size = %d" % args.eval_batch_size)
+    print("  Num examples = %d" % len_eval_dataset)
+    print("  Batch size = %d" % eval_batch_size)
 
     eval_loss = 0.0
     nb_eval_steps = 0
@@ -58,7 +60,7 @@ def evaluate(args, model, tokenizer, device, prefix=""):
     out_label_ids = None
     predictions = []
     ground_truth = []
-    for batch in tqdm(eval_dataloader, desc="Evaluating"):
+    for batch in tqdm(eval_dataloader, total=len_eval_dataset//eval_batch_size+1, desc='3.paragraph_ranking.evaluate', file=sys_stdout):
         model.eval()
         batch = tuple(t.to(args.device) for t in batch)
 
