@@ -13,7 +13,7 @@ from torch import (
     sigmoid as torch_sigmoid,
     tanh as torch_tanh,
     where as torch_where,
-    from_numpy as torch_from_numpy,
+    as_tensor as torch_as_tensor,
 )
 from torch.nn import Module, ModuleList, Dropout, Linear, LayerNorm, Parameter, ParameterList, Sequential, ReLU, LSTM
 from torch.nn.functional import relu as F_relu, dropout as F_dropout, softmax as F_softmax
@@ -491,7 +491,7 @@ class PredictionLayer(Module):
             return Variable(self.cache_mask[:S, :S], requires_grad=False)
         self.cache_S = S
         np_mask = np_tril(np_triu(np_ones((S, S)), 0), 15)
-        self.cache_mask = outer.data.new(S, S).copy_(torch_from_numpy(np_mask))
+        self.cache_mask = outer.data.new(S, S).copy_(torch_as_tensor(np_mask))
         return Variable(self.cache_mask, requires_grad=False)
 
     def forward(self, batch, context_input, sent_logits, packing_mask=None, return_yp=False):
