@@ -1,8 +1,6 @@
 import gzip
 import pickle
 import json
-import torch
-import numpy as np
 import argparse
 import os
 
@@ -10,11 +8,8 @@ from os.path import join
 from collections import Counter
 
 from model_envs import MODEL_CLASSES
-from csr_mhqa.data_processing import Example, InputFeatures, get_cached_filename
-from csr_mhqa.utils import get_final_text
-from envs import DATASET_FOLDER, OUTPUT_FOLDER
-from eval.hotpot_evaluate_v1 import eval as hotpot_eval
-from eval.hotpot_evaluate_v1 import normalize_answer
+from csr_mhqa.data_processing import get_cached_filename
+from eval.hotpot_evaluate_v1 import eval as hotpot_eval, normalize_answer
 
 def predict(examples, features, pred_file, tokenizer, use_ent_ans=False):
     answer_dict = {}

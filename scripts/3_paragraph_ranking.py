@@ -18,7 +18,6 @@ from torch import (
     as_tensor as torch_as_tensor,
     int64 as torch_int64,
     float32 as torch_float32,
-    load as torch_load,
     device as torch_device,
 )
 from torch.cuda import is_available as cuda_is_available
