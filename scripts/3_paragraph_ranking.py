@@ -116,7 +116,7 @@ def rank_paras(data, pred_score):
     ranked_paras = {}
     cur_ptr = 0
 
-    for case in tqdm(data):
+    for case in tqdm(data, desc='3_paragraph_ranking.rank_paras', file=sys_stdout):
         key = case['_id']
         tem_ptr = cur_ptr
         case_context = case['context']
