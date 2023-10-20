@@ -89,7 +89,7 @@ def evaluate(args, model, tokenizer, device, prefix=""):
             preds = np_append(preds, logits, axis=0)
             out_label_ids = np_append(out_label_ids, label_ids, axis=0)
 
-    eval_loss = eval_loss / nb_eval_steps
+    eval_loss /= nb_eval_steps
     if args.output_mode == "classification":
         preds = np_argmax(preds, axis=1)
     elif args.output_mode == "regression":
