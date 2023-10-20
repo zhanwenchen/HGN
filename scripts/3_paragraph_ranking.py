@@ -20,7 +20,8 @@ from torch import (
     load as torch_load,
     device as torch_device,
 )
-from torch.cuda import is_available
+from torch.cuda import is_available as cuda_is_available
+from torch.backends.mps import is_available as mps_is_available
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
 # This line must be above local package reference
 from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,
@@ -183,10 +184,9 @@ def set_args():
                              "than this will be truncated, sequences shorter will be padded.")
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
-    parser.add_argument("--no_cuda", action='store_true',
-                        help="Avoid using CUDA when available")
     parser.add_argument("--per_gpu_eval_batch_size", default=64, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
+    parser.add_argument("--device_str", type=str, required=True, help="Device string. Can be either 'cuda', 'mps', or 'cpu'")
 
     args = parser.parse_args()
 
@@ -196,7 +196,20 @@ if __name__ == "__main__":
     args = set_args()
 
     # Setup CUDA
-    args.device = torch_device("cuda" if is_available() and not args.no_cuda else "cpu")
+    device_str = args.device_str
+
+    match device_str:
+        case 'cuda':
+            assert cuda_is_available()
+            print('Using CUDA')
+        case 'mps':
+            assert mps_is_available()
+            print('Using MPS')
+        case 'cpu':
+            print('Using CPU')
+        case _:
+            raise ValueError(f'Unknown device string {device_str}')
+    device = torch_device(device_str)
 
     processor = processors[args.task_name]()
     args.output_mode = output_modes[args.task_name]
@@ -208,17 +221,18 @@ if __name__ == "__main__":
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           num_labels=num_labels,
                                           finetuning_task=args.task_name,
-                                          device_map=args.device)
+                                          device_map=device)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
-                                                do_lower_case=args.do_lower_case, device_map=args.device)
+                                                do_lower_case=args.do_lower_case, device_map=device)
 
     # Load a trained model that you have fine-tuned
-    model_state_dict = torch_load(args.eval_ckpt, map_location=args.device)
-    model = model_class.from_pretrained(args.model_name_or_path,
+    # model_state_dict = torch_load(f=args.eval_ckpt, map_location=device)
+    # model = model_class.from_pretrained(args.model_name_or_path,
+                                        # state_dict=model_state_dict,
+    model = model_class.from_pretrained(args.eval_ckpt,
                                         config=config,
-                                        state_dict=model_state_dict,
-                                        device_map=args.device)
-    score = evaluate(args, model, tokenizer, args.device, prefix="")
+                                        device_map=device)
+    score = evaluate(args, model, tokenizer, device, prefix="")
 
     # load source data
     with open(args.raw_data, 'r') as file_in:

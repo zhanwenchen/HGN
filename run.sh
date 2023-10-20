@@ -52,13 +52,14 @@ preprocess() {
         python scripts/2_extract_ner.py $INPUT_FILE $OUTPUT_PROCESSED/doc_link_ner.json $OUTPUT_PROCESSED/ner.json
         error_check $? || error_exit "Error in Step 2. Extract NER for Question and Context"
 
-        echo "3. Paragraph ranking"
+        echo "3a. Paragraph Selection"
         # Output: para_ranking.json
-        python scripts/3_prepare_para_sel.py $INPUT_FILE $OUTPUT_PROCESSED/hotpot_ss_$DATA_TYPE.csv
+        python scripts/3_prepare_para_sel.py $INPUT_FILE $OUTPUT_PROCESSED/hotpot_ss_$DATA_TYPE.csv --device_str=cuda
         error_check $? || error_exit "Error in Step 3a. Paragraph 3_prepare_para_sel"
 
+        echo "3b. Paragraph ranking"
         # switch to RoBERTa for final leaderboard
-        python scripts/3_paragraph_ranking.py --data_dir $OUTPUT_PROCESSED --eval_ckpt $DATA_ROOT/models/finetuned/PS/pytorch_model.bin --raw_data $INPUT_FILE --input_data $OUTPUT_PROCESSED/hotpot_ss_$DATA_TYPE.csv --model_name_or_path roberta-large --model_type roberta --max_seq_length 256 --per_gpu_eval_batch_size 128 --device_str=cuda
+        python scripts/3_paragraph_ranking.py --data_dir $OUTPUT_PROCESSED --eval_ckpt $DATA_ROOT/models/finetuned/PS/pytorch_model.bin --raw_data $INPUT_FILE --input_data $OUTPUT_PROCESSED/hotpot_ss_$DATA_TYPE.csv --model_name_or_path roberta-large --model_type roberta --max_seq_length 256 --per_gpu_eval_batch_size 192 --device_str=cuda
         error_check $? || error_exit "Error in Step 3b. Paragraph 3_paragraph_ranking"
 
         echo "4. MultiHop Paragraph Selection"

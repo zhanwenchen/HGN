@@ -59,8 +59,10 @@ model_path: str = os_path_join(exp_name, 'model.pkl')
 logger.info("Loading encoder from: {}".format(encoder_path))
 logger.info("Loading model from: {}".format(model_path))
 
-encoder, _ = load_encoder_model(encoder_name_or_path, model_type, device)
+encoder, _ = load_encoder_model(encoder_name_or_path, model_type)
+encoder.to(device)
 model = HierarchicalGraphNetwork(config=args)
+model.to(device)
 
 if encoder_path is not None:
     encoder.load_state_dict(torch_load(encoder_path, map_location=device))

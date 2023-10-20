@@ -77,14 +77,14 @@ model_type: str = args.model_type
 encoder_name_or_path: str = args.encoder_name_or_path
 encoder, _ = load_encoder_model(encoder_name_or_path, model_type, device)
 model = HierarchicalGraphNetwork(config=args)
+encoder.to(device)
+model.to(device)
 
 if encoder_path is not None:
     encoder.load_state_dict(torch_load(encoder_path, map_location=device))
 if model_path is not None:
-    model.load_state_dict(torch_load(model_path, map_location=device))
+    model.load_state_dict(state_dict=torch_load(model_path, map_location=device))
 
-encoder.to(device)
-model.to(device)
 
 _, _, tokenizer_class = MODEL_CLASSES[model_type]
 tokenizer = tokenizer_class.from_pretrained(encoder_name_or_path,
