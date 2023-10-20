@@ -82,18 +82,38 @@ def update_sp(metrics, prediction, gold):
     metrics['sp_recall'] += recall
     return em, prec, recall
 
+def update_is_missing(metrics, prediction, gold):
+    assert isinstance(prediction, int)
+    match (gold, prediction):
+        case (1, 1): # TP
+            metrics['is_missing_tp'] += 1
+        case (1, 0): # FN
+            metrics['is_missing_fn'] += 1
+        case (0, 0): # TN
+            metrics['is_missing_tn'] += 1
+        case (0, 1): # FP
+            metrics['is_missing_fp'] += 1
+        case _:
+            raise ValueError(f'update_is_missing: (gold, prediction) = {(gold, prediction)}')
+
 def eval(prediction_file, gold_file):
     with open(prediction_file) as f:
         prediction = ujson_load(f)
     with open(gold_file) as f:
         gold = ujson_load(f)
 
+    metrics_keys_average =  {'em': 0, 'f1': 0, 'prec': 0, 'recall': 0,
+        'sp_em': 0, 'sp_f1': 0, 'sp_prec': 0, 'sp_recall': 0,  'joint_em': 0, 'joint_f1': 0, 'joint_prec': 0, 'joint_recall': 0}
+
     metrics = {'em': 0, 'f1': 0, 'prec': 0, 'recall': 0,
         'sp_em': 0, 'sp_f1': 0, 'sp_prec': 0, 'sp_recall': 0,
+        'is_missing_tp': 0, 'is_missing_fn': 0, 'is_missing_tn': 0, 'is_missing_fp': 0,
+        'is_missing_em': 0, 'is_missing_f1': 0, 'is_missing_prec': 0, 'is_missing_recall': 0,
         'joint_em': 0, 'joint_f1': 0, 'joint_prec': 0, 'joint_recall': 0}
 
     answer = prediction['answer']
     sp = prediction['sp']
+    is_missing = prediction['is_missing']
     total = 0
     for dp in gold:
         cur_id = dp['_id']
@@ -110,6 +130,11 @@ def eval(prediction_file, gold_file):
         else:
             sp_em, sp_prec, sp_recall = update_sp(
                 metrics, sp[cur_id], dp['supporting_facts'])
+        if cur_id not in is_missing:
+            print('missing is_missing {}'.format(cur_id))
+            can_eval_joint = False
+        else:
+            update_is_missing(metrics, is_missing[cur_id], dp['is_missing'])
 
         if can_eval_joint:
             joint_prec = prec * sp_prec
@@ -128,9 +153,22 @@ def eval(prediction_file, gold_file):
 
             total += 1
 
-    for k in metrics.keys():
+    for k in metrics_keys_average.keys():
         metrics[k] /= total
 
+    tp = metrics['is_missing_tp']
+    fn = metrics['is_missing_fn']
+    tn = metrics['is_missing_tn']
+    fp = metrics['is_missing_fp']
+    N = tp + fn + tn + fp
+    em: int = tp + tn
+    precision: float = tp / (tp + fp)
+    recall: float = tp / (tp + fn)
+    f1: float = 2.0 / ((1.0 / precision) + (1.0 / recall))
+    metrics['is_missing_em'] = em
+    metrics['is_missing_f1'] = f1
+    metrics['is_missing_prec'] = prec
+    metrics['is_missing_recall'] = recall
     return metrics
 
 if __name__ == '__main__':

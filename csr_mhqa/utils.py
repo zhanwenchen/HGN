@@ -21,12 +21,12 @@ from csr_mhqa.data_processing import IGNORE_INDEX
 
 logger = getLogger(__name__)
 
-def load_encoder_model(encoder_name_or_path, model_type):
+def load_encoder_model(encoder_name_or_path, model_type, device):
     if encoder_name_or_path in [None, 'None', 'none']:
         raise ValueError('no checkpoint provided for model!')
 
     config_class, model_encoder, tokenizer_class = MODEL_CLASSES[model_type]
-    config = config_class.from_pretrained(encoder_name_or_path)
+    config = config_class.from_pretrained(encoder_name_or_path, device_map=device)
     if config is None:
         raise ValueError(f'config.json is not found at {encoder_name_or_path}')
 
@@ -36,9 +36,9 @@ def load_encoder_model(encoder_name_or_path, model_type):
             encoder_file = os_path_join(encoder_name_or_path, 'pytorch_model.bin')
         else:
             encoder_file = os_path_join(encoder_name_or_path, 'encoder.pkl')
-        encoder = model_encoder.from_pretrained(encoder_file, config=config)
+        encoder = model_encoder.from_pretrained(encoder_file, config=config, device_map=device)
     else:
-        encoder = model_encoder.from_pretrained(encoder_name_or_path, config=config)
+        encoder = model_encoder.from_pretrained(encoder_name_or_path, config=config, device_map=device)
 
     return encoder, config
 
@@ -68,7 +68,7 @@ def get_optimizer(encoder, model, args, learning_rate, remove_pooler=False):
 
     return optimizer
 
-def compute_loss(args, batch, start, end, para, sent, ent, q_type):
+def compute_loss(args, batch, start, end, para, sent, ent, q_type, is_missing):
     criterion = CrossEntropyLoss(reduction='mean', ignore_index=IGNORE_INDEX)
     binary_criterion = BCEWithLogitsLoss(reduction='mean')
     loss_span = args.ans_lambda * (criterion(start, batch['y1']) + criterion(end, batch['y2']))
@@ -81,9 +81,10 @@ def compute_loss(args, batch, start, end, para, sent, ent, q_type):
     loss_ent = args.ent_lambda * criterion(ent, batch['is_gold_ent'].long())
     loss_para = args.para_lambda * criterion(para.view(-1, 2), batch['is_gold_para'].long().view(-1))
 
-    loss = loss_span + loss_type + loss_sup + loss_ent + loss_para
+    loss_is_missing = args.is_missing_lambda * binary_criterion(is_missing, batch['is_missing'])
+    loss = loss_span + loss_type + loss_sup + loss_ent + loss_para + loss_is_missing
 
-    return loss, loss_span, loss_type, loss_sup, loss_ent, loss_para
+    return loss, loss_span, loss_type, loss_sup, loss_ent, loss_para, loss_is_missing
 
 
 def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, prediction_file, eval_file, dev_gold_file):
@@ -93,6 +94,7 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
     answer_dict = {}
     answer_type_dict = {}
     answer_type_prob_dict = {}
+    answer_is_missing_prob_dict = {}
 
     dataloader.refresh()
 
@@ -113,18 +115,21 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
             batch['context_encoding'] = outputs[0]
             batch['context_mask'] = context_mask.float().to(device)
             del context_mask
-            start, end, q_type, paras, sent, ent, yp1, yp2 = model(batch, return_yp=True)
+            start, end, q_type, paras, sent, ent, is_missing, yp1, yp2 = model(batch, return_yp=True)
 
         type_prob = F_softmax(q_type, dim=1).data.cpu().numpy()
+        is_missing_prob = torch_sigmoid(is_missing).round().data.cpu().numpy()
         ids = batch['ids']
-        answer_dict_, answer_type_dict_, answer_type_prob_dict_ = convert_to_tokens(example_dict, feature_dict, ids,
+        answer_dict_, answer_type_dict_, answer_type_prob_dict_, answer_is_missing_prob_dict_ = convert_to_tokens(example_dict, feature_dict, ids,
                                                                                     yp1.data.cpu().numpy().tolist(),
                                                                                     yp2.data.cpu().numpy().tolist(),
-                                                                                    type_prob)
+                                                                                    type_prob,
+                                                                                    is_missing_prob)
 
         answer_type_dict.update(answer_type_dict_)
         answer_type_prob_dict.update(answer_type_prob_dict_)
         answer_dict.update(answer_dict_)
+        answer_is_missing_prob_dict.update(answer_is_missing_prob_dict_)
 
         predict_support_np = torch_sigmoid(sent[:, :, 1]).data.cpu().numpy()
 
@@ -160,7 +165,8 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
             prediction = {'answer': ans_dict,
                           'sp': total_sp_dict[thresh_i],
                           'type': answer_type_dict,
-                          'type_prob': answer_type_prob_dict}
+                          'type_prob': answer_type_prob_dict,
+                          'is_missing_prob': answer_is_missing_prob_dict}
             tmp_file = os_path_join(os_path_dirname(pred_file), 'tmp.json')
             with open(tmp_file, 'w') as f:
                 json_dump(prediction, f)
@@ -175,7 +181,8 @@ def eval_model(args, encoder, model, dataloader, example_dict, feature_dict, pre
         return best_metrics, best_threshold
 
     best_metrics, best_threshold = choose_best_threshold(answer_dict, prediction_file)
-    json_dump(best_metrics, open(eval_file, 'w'))
+    with open(eval_file, 'w') as file_out:
+        json_dump(best_metrics, file_out)
 
     return best_metrics, best_threshold
 
@@ -293,9 +300,10 @@ def get_final_text(pred_text, orig_text, do_lower_case, verbose_logging=False):
     output_text = orig_text[orig_start_position:(orig_end_position + 1)]
     return output_text
 
-def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
+def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob, is_missing_prob):
     answer_dict, answer_type_dict = {}, {}
     answer_type_prob_dict = {}
+    answer_is_missing_prob_dict = {}
 
     q_type = np_argmax(q_type_prob, 1)
 
@@ -304,7 +312,6 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
         example = examples[qid]
 
         tok_to_orig_map = feature.token_to_orig_map
-        orig_all_tokens = example.question_tokens + example.doc_tokens
 
         final_text = " "
         len_tok_to_orig_map: int = len(tok_to_orig_map)
@@ -320,15 +327,11 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
             else:
                 orig_tok_start -= ques_tok_len
                 orig_tok_end -= ques_tok_len
-                ctx_start_idx = example.ctx_word_to_char_idx[orig_tok_start]
-                ctx_end_idx = example.ctx_word_to_char_idx[orig_tok_end] + len(example.doc_tokens[orig_tok_end])
                 final_text = example.ctx_text[example.ctx_word_to_char_idx[orig_tok_start]:example.ctx_word_to_char_idx[orig_tok_end]+len(example.doc_tokens[orig_tok_end])]
 
         return final_text
 
     for i, qid in enumerate(ids):
-        feature = features[qid]
-        answer_text = ''
         q_type_i = q_type[i]
         if q_type_i in [0, 3]:
             answer_text = get_ans_from_pos(qid, y1[i], y2[i])
@@ -342,8 +345,8 @@ def convert_to_tokens(examples, features, ids, y1, y2, q_type_prob):
         answer_dict[qid] = answer_text
         answer_type_prob_dict[qid] = q_type_prob[i].tolist()
         answer_type_dict[qid] = q_type_i.item()
-
-    return answer_dict, answer_type_dict, answer_type_prob_dict
+        answer_is_missing_prob_dict[qid] = is_missing_prob
+    return answer_dict, answer_type_dict, answer_type_prob_dict, answer_is_missing_prob_dict
 
 def count_parameters(model, trainable_only=True, is_dict=False):
     """

@@ -3,14 +3,18 @@ from json import load as json_load, dump as json_dump
 from re import sub as re_sub
 from tqdm import tqdm
 from numpy import zeros as np_zeros, float32 as np_float32
-from torch import tensor as torch_tensor, from_numpy as torch_from_numpy, matmul as torch_matmul
+from torch import as_tensor as torch_as_tensor
 
 assert len(argv) == 6
 
-raw_data = json_load(open(argv[1], 'r'))
-doc_link_data = json_load(open(argv[2], 'r'))
-ent_data = json_load(open(argv[3], 'r'))
-para_data = json_load(open(argv[4], 'r'))
+with open(argv[1], 'r') as file_in:
+    raw_data = json_load(file_in)
+with open(argv[2], 'r') as file_in:
+    doc_link_data = json_load(file_in)
+with open(argv[3], 'r') as file_in:
+    ent_data = json_load(file_in)
+with open(argv[4], 'r') as file_in:
+    para_data = json_load(file_in)
 output_file = argv[5]
 
 def select_titles(question_text, question_entities):
@@ -152,7 +156,7 @@ for case in tqdm(raw_data):
 
     if sum(sel_para_idx) == 1:
         next_titles = []
-        next_vec = bfs_step(torch_tensor(sel_para_idx), torch_from_numpy(para_adj))
+        next_vec = bfs_step(torch_as_tensor(sel_para_idx), torch_as_tensor(para_adj))
         next_vec_list = next_vec.nonzero().squeeze(1).numpy().tolist()
         for sent_id in next_vec_list:
             next_titles.append(id_to_title[sent_id])
@@ -194,4 +198,5 @@ for case in tqdm(raw_data):
     selected_para_dict[guid].append(other_titles)
     para_num.append(sum(sel_para_idx))
 
-json_dump(selected_para_dict, open(output_file, 'w'))
+with open(output_file, 'w') as file_out:
+    json_dump(selected_para_dict, file_out)

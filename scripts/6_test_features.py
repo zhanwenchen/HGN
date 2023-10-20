@@ -1,8 +1,6 @@
 import gzip
 import pickle
 import json
-import torch
-import numpy as np
 import argparse
 import os
 
@@ -10,15 +8,12 @@ from os.path import join
 from collections import Counter
 
 from model_envs import MODEL_CLASSES
-from csr_mhqa.data_processing import Example, InputFeatures, get_cached_filename
-from csr_mhqa.utils import get_final_text
-from envs import DATASET_FOLDER, OUTPUT_FOLDER
-from eval.hotpot_evaluate_v1 import eval as hotpot_eval
-from eval.hotpot_evaluate_v1 import normalize_answer
+from csr_mhqa.data_processing import get_cached_filename
+from eval.hotpot_evaluate_v1 import eval as hotpot_eval, normalize_answer
 
 def predict(examples, features, pred_file, tokenizer, use_ent_ans=False):
-    answer_dict = dict()
-    sp_dict = dict()
+    answer_dict = {}
+    sp_dict = {}
     ids = list(examples.keys())
 
     max_sent_num = 0
@@ -85,7 +80,8 @@ def predict(examples, features, pred_file, tokenizer, use_ent_ans=False):
         sp_dict[qid] = cur_sp
 
     final_pred = {'answer': answer_dict, 'sp': sp_dict}
-    json.dump(final_pred, open(pred_file, 'w'))
+    with open(pred_file, 'w') as file_out:
+        json.dump(final_pred, file_out)
 
     print("Maximum sentence num: {}".format(max_sent_num))
     print("Maximum entity num: {}".format(max_entity_num))
@@ -125,9 +121,12 @@ if __name__ == '__main__':
     cached_graphs_file = os.path.join(args.input_dir, 
                                      get_cached_filename('graphs', args))
 
-    examples = pickle.load(gzip.open(cached_examples_file, 'rb'))
-    features = pickle.load(gzip.open(cached_features_file, 'rb'))
-    graph_dict = pickle.load(gzip.open(cached_graphs_file, 'rb'))
+    with gzip.open(cached_examples_file, 'rb') as file_in:
+        examples = pickle.load(file_in)
+    with gzip.open(cached_features_file, 'rb') as file_in:
+        features = pickle.load(file_in)
+    with gzip.open(cached_graphs_file, 'rb') as file_in:
+        graph_dict = pickle.load(file_in)
 
     example_dict = { example.qas_id: example for example in examples}
     feature_dict = { feature.qas_id: feature for feature in features}

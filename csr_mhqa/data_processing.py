@@ -7,7 +7,6 @@ from torch import (
     int64 as torch_int64,
     float32 as torch_float32,
     zeros_like as torch_zeros_like,
-    from_numpy as torch_from_numpy,
     where as torch_where,
 )
 from numpy import ceil as np_ceil
@@ -178,9 +177,9 @@ class DataIteratorPack(object):
         ent_limit = self.ent_limit
 
         # BERT input
-        context_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64)
-        context_mask = torch_empty(bsz, max_seq_length, dtype=torch_int64)
-        segment_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64)
+        context_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
+        context_mask = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
+        segment_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
 
         # Mappings
         query_mapping = torch_empty(bsz, max_seq_length, device=device)
@@ -308,7 +307,7 @@ class DataIteratorPack(object):
 
                 qas_id = case.qas_id
                 tmp_graph = graph_dict[qas_id]
-                graph_adj = torch_from_numpy(tmp_graph['adj']).to(device)
+                graph_adj = torch_as_tensor(tmp_graph['adj'], device=device)
                 for k in range(graph_adj.size(0)):
                     graph_adj[k, k] = 8
                 for edge_type in mask_edge_types:

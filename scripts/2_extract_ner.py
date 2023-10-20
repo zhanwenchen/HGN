@@ -26,9 +26,10 @@ def extract_ner_from_titles(sent, titles, context_ners=None):
                 if ent[3] in ent_type:
                     candidates.add(ent[0])
 
+    sent_lower = sent.lower()
     for title in titles:
         stripped_title = re_sub(r' \(.*?\)$', '', title)
-        start_pos = sent.lower().find(stripped_title.lower())
+        start_pos = sent_lower.find(stripped_title.lower())
         if start_pos != -1:
             end_pos = start_pos + len(stripped_title)
             # ! use title rather than the matched text in the question
@@ -36,7 +37,7 @@ def extract_ner_from_titles(sent, titles, context_ners=None):
 
     for word in candidates:
         word = re_sub(r' \(.*?\)$', '', word)
-        start_pos = sent.lower().find(word.lower())
+        start_pos = sent_lower.find(word.lower())
         if start_pos != -1:
             end_pos = start_pos + len(word)
             text = sent[start_pos: end_pos]
@@ -73,9 +74,10 @@ def extract_context_ner(full_data, ner_data=None):
     for case in full_data:
         guid = case['_id']
         context_guid2ner[guid] = []
-        titles = list(dict(case['context']).keys())
+        case_context = case['context']
+        titles = list(dict(case_context).keys())
 
-        for title, sents in case['context']:
+        for title, sents in case_context:
             context_ner = []
             for sent, sent_ner in zip(sents, ner_data[title]['text_ner']):
                 context_ner.append([])
@@ -89,9 +91,11 @@ def extract_context_ner(full_data, ner_data=None):
 
     return context_guid2ner
 
-data = json_load(open(input_file, 'r'))
+with open(input_file, 'r') as file_in:
+    data = json_load(file_in)
 # ner_data is from spacy which has been extracted in 0_build_db.py
-ner_data = json_load(open(ner_file, 'r'))
+with open(ner_file, 'r') as file_in:
+    ner_data = json_load(file_in)
 ques_guid2ner = extract_question_ner(data)
 context_guid2ner = extract_context_ner(data, ner_data)
 
@@ -115,4 +119,5 @@ for case in data:
     output_data[guid]['question'] = ques_ent_1 + ques_ent_2
     output_data[guid]['context'] = context_ners
 
-json_dump(output_data, open(output_file, 'w'))
+with open(output_file, 'w') as file_out:
+    json_dump(output_data, file_out)

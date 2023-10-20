@@ -6,19 +6,20 @@
 # LICENSE file in the root directory of this source tree.
 """A script to read in and store documents in a sqlite database."""
 
+from unicodedata import normalize as unicodedata_normalize
 from argparse import ArgumentParser
 from json import loads as json_loads
 from os import walk as os_walk
 from os.path import isfile as os_path_isfile, isdir as os_path_isdir, join as os_path_join
-from multiprocessing import Pool as ProcessPool
+from multiprocessing import Pool
 from logging import getLogger, INFO, Formatter, StreamHandler
 from importlib.util import spec_from_file_location, module_from_spec
 from bz2 import open as bz2_open
 from sqlite3 import connect as sqlite3_connect
-from tqdm import tqdm
 from pickle import dumps as pickle_dumps
+from tqdm import tqdm
 from spacy import load as spacy_load
-from drqa.retriever.utils import normalize
+
 
 logger = getLogger()
 logger.setLevel(INFO)
@@ -81,16 +82,19 @@ def get_contents(filename):
             if not doc:
                 continue
             # Add the document
-            assert len(doc['text']) == len(doc['text_with_links'])
-            _text, _text_with_links = pickle_dumps(doc['text']), pickle_dumps(doc['text_with_links'])
+            doc_text = doc.pop('text')
+            doc_text_with_links = doc.pop('text_with_links')
+            len_doc_text = len(doc_text)
+            assert len_doc_text == len(doc_text_with_links)
+            _text, _text_with_links = pickle_dumps(doc_text), pickle_dumps(doc_text_with_links)
 
             _text_ner = []
-            for sent in doc['text']:
+            for sent in doc_text:
                 ent_list = [(ent.text, ent.start_char, ent.end_char, ent.label_) for ent in nlp(sent).ents]
                 _text_ner.append(ent_list)
             _text_ner_str = pickle_dumps(_text_ner)
 
-            documents.append((normalize(doc['id']), doc['url'], doc['title'], _text, _text_with_links, _text_ner_str, len(doc['text'])))
+            documents.append((unicodedata_normalize('NFD', doc.pop('id')), doc.pop('url'), doc.pop('title'), _text, _text_with_links, _text_ner_str, len_doc_text))
 
     return documents
 
@@ -107,17 +111,16 @@ def store_contents(data_path, save_path, preprocess, num_workers=None):
         num_workers: Number of parallel processes to use when reading docs.
     """
     if os_path_isfile(save_path):
-        raise RuntimeError('%s already exists! Not overwriting.' % save_path)
+        raise RuntimeError(f'{save_path} already exists! Not overwriting.')
 
     logger.info('Reading into database...')
     conn = sqlite3_connect(save_path)
     c = conn.cursor()
     c.execute("CREATE TABLE documents (id PRIMARY KEY, url, title, text, text_with_links, text_ner, sent_num);")
 
-    workers = ProcessPool(num_workers, initializer=init, initargs=(preprocess,))
-    files = [f for f in iter_files(data_path)]
-    count = 0
-    with tqdm(total=len(files)) as pbar:
+    files = list(iter_files(data_path))
+    with Pool(num_workers, initializer=init, initargs=(preprocess,)) as workers, tqdm(total=len(files)) as pbar:
+        count = 0
         for pairs in tqdm(workers.imap_unordered(get_contents, files)):
             count += len(pairs)
             c.executemany("INSERT INTO documents VALUES (?,?,?,?,?,?,?)", pairs)

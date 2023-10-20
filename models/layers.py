@@ -13,7 +13,7 @@ from torch import (
     sigmoid as torch_sigmoid,
     tanh as torch_tanh,
     where as torch_where,
-    from_numpy as torch_from_numpy,
+    as_tensor as torch_as_tensor,
 )
 from torch.nn import Module, ModuleList, Dropout, Linear, LayerNorm, Parameter, ParameterList, Sequential, ReLU, LSTM
 from torch.nn.functional import relu as F_relu, dropout as F_dropout, softmax as F_softmax
@@ -143,9 +143,6 @@ class GATSelfAttention(Module):
         self.act = get_act('lrelu:0.2')
 
     def forward(self, input_state, adj, node_mask=None, query_vec=None):
-        size = adj.size()
-        dtype = adj.dtype
-        device = adj.device
         zero_vec = torch_zeros_like(adj)
         scores = torch_zeros_like(adj)
         dropout = self.dropout
@@ -265,15 +262,10 @@ class GraphBlock(Module):
             self.entity_mlp = OutputLayer(hidden_dim*2, config, num_answer=1)
 
     def forward(self, batch, input_state, query_vec):
-        context_lens = batch['context_lens']
-        context_mask = batch['context_mask']
-        sent_mapping = batch['sent_mapping']
         sent_start_mapping = batch['sent_start_mapping']
         sent_end_mapping = batch['sent_end_mapping']
-        para_mapping = batch['para_mapping']
         para_start_mapping = batch['para_start_mapping']
         para_end_mapping = batch['para_end_mapping']
-        ent_mapping = batch['ent_mapping']
         ent_start_mapping = batch['ent_start_mapping']
         ent_end_mapping = batch['ent_end_mapping']
 
@@ -295,7 +287,6 @@ class GraphBlock(Module):
 
         N, max_para_num, _ = para_state.size()
         _, max_sent_num, _ = sent_state.size()
-        _, max_ent_num, _ = ent_state.size()
 
         if self.q_update:
             graph_state = self.gat_linear(torch_cat([para_state, sent_state, ent_state], dim=1)) # N * (max_para + max_sent + max_ent) * d
@@ -348,8 +339,6 @@ class GatedAttention(Module):
         :param mask: query_mask N * Lm
         :return:
         """
-        bsz, input_len, memory_len = input.size(0), input.size(1), memory.size(1)
-
         input_dot = F_relu(self.input_linear_1(input))  # N x Ld x d
         memory_dot = F_relu(self.memory_linear_1(memory))  # N x Lm x d
 
@@ -446,7 +435,7 @@ class LSTMWrapper(Module):
 
     def forward(self, input, input_lengths=None):
         # input_length must be in decreasing order
-        bsz, slen = input.size(0), input.size(1)
+        slen = input.size(1)
         output = input
         outputs = []
 
@@ -491,6 +480,7 @@ class PredictionLayer(Module):
         self.start_linear = OutputLayer(input_dim, config, num_answer=1)
         self.end_linear = OutputLayer(input_dim, config, num_answer=1)
         self.type_linear = OutputLayer(input_dim, config, num_answer=4)
+        self.is_missing_linear = OutputLayer(input_dim, config, num_answer=1)
 
         self.cache_S = 0
         self.cache_mask = None
@@ -501,7 +491,7 @@ class PredictionLayer(Module):
             return Variable(self.cache_mask[:S, :S], requires_grad=False)
         self.cache_S = S
         np_mask = np_tril(np_triu(np_ones((S, S)), 0), 15)
-        self.cache_mask = outer.data.new(S, S).copy_(torch_from_numpy(np_mask))
+        self.cache_mask = outer.data.new(S, S).copy_(torch_as_tensor(np_mask))
         return Variable(self.cache_mask, requires_grad=False)
 
     def forward(self, batch, context_input, sent_logits, packing_mask=None, return_yp=False):
@@ -510,9 +500,10 @@ class PredictionLayer(Module):
         start_prediction = self.start_linear(context_input).squeeze(2) - inverse_context_mask  # N x L
         end_prediction = self.end_linear(context_input).squeeze(2) - inverse_context_mask  # N x L
         type_prediction = self.type_linear(context_input[:, 0, :])
+        is_missing_prediction = self.is_missing_linear(context_input[:, 0, :])
 
         if not return_yp:
-            return start_prediction, end_prediction, type_prediction
+            return start_prediction, end_prediction, type_prediction, is_missing_prediction
 
         outer = start_prediction[:, :, None] + end_prediction[:, None]
         outer_mask = self.get_output_mask(outer)
@@ -523,4 +514,4 @@ class PredictionLayer(Module):
         # yp2: end
         yp1 = outer.max(dim=2)[0].max(dim=1)[1]
         yp2 = outer.max(dim=1)[0].max(dim=1)[1]
-        return start_prediction, end_prediction, type_prediction, yp1, yp2
+        return start_prediction, end_prediction, type_prediction, is_missing_prediction, yp1, yp2

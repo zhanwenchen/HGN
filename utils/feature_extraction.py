@@ -17,6 +17,7 @@
 
 from logging import getLogger
 from collections import Counter
+from sys import stdout as sys_stdout
 from tqdm import tqdm
 from pandas import read_csv as pd_read_csv
 from scipy.stats import pearsonr, spearmanr
@@ -100,7 +101,7 @@ def convert_examples_to_features(examples, label_list, max_seq_length,
     convert_tokens_to_ids: function = tokenizer.convert_tokens_to_ids
     special_tokens_count: int = 4 if sep_token_extra else 3
     max_length: int = max_seq_length - special_tokens_count
-    for (ex_index, example) in enumerate(tqdm(examples)):
+    for (ex_index, example) in enumerate(tqdm(examples, file=sys_stdout, desc='feature_extraction.convert_examples_to_features')):
         if ex_index % 10000 == 0:
             logger.info("Writing example %d of %d" % (ex_index, len(examples)))
 

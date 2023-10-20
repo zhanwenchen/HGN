@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from logging import getLogger
 from json import load as json_load, dump as json_dump
 from os.path import join as os_path_join
-from tqdm import tqdm
+from sys import stdout as sys_stdout
 from numpy import (
     append as np_append,
     argmax as np_argmax,
@@ -11,18 +11,18 @@ from numpy import (
     exp as np_exp,
     array as np_array,
 )
+from tqdm import tqdm
 from pandas import DataFrame
 from torch import (
     no_grad as torch_no_grad,
-    tensor as torch_tensor,
-    long as torch_long,
-    float as torch_float,
-    load as torch_load,
+    as_tensor as torch_as_tensor,
+    int64 as torch_int64,
+    float32 as torch_float32,
     device as torch_device,
 )
-from torch.cuda import is_available
+from torch.cuda import is_available as cuda_is_available
+from torch.backends.mps import is_available as mps_is_available
 from torch.utils.data import DataLoader, SequentialSampler, TensorDataset
-from apex.amp import initialize
 # This line must be above local package reference
 from transformers import (BertConfig, BertForSequenceClassification, BertTokenizer,
                           RobertaConfig, RobertaTokenizer, RobertaForSequenceClassification)
@@ -37,20 +37,22 @@ MODEL_CLASSES = {
 
 logger = getLogger(__name__)
 
-def evaluate(args, model, tokenizer, prefix=""):
+@torch_no_grad()
+def evaluate(args, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_task = args.task_name
-    eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, evaluate=True)
+    eval_dataset = load_and_cache_examples(args, eval_task, tokenizer, device, evaluate=True)
 
-    args.eval_batch_size = args.per_gpu_eval_batch_size
+    eval_batch_size = args.per_gpu_eval_batch_size
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
 
     # Eval!
-    print("***** Running evaluation {} *****".format(prefix))
-    print("  Num examples = %d" % len(eval_dataset))
-    print("  Batch size = %d" % args.eval_batch_size)
+    len_eval_dataset = len(eval_dataset)
+    print(f'***** Running evaluation {prefix} *****')
+    print(f'  Num examples = {len_eval_dataset}')
+    print(f'  Batch size = {eval_batch_size}')
 
     eval_loss = 0.0
     nb_eval_steps = 0
@@ -58,25 +60,26 @@ def evaluate(args, model, tokenizer, prefix=""):
     out_label_ids = None
     predictions = []
     ground_truth = []
-    for batch in tqdm(eval_dataloader, desc="Evaluating"):
-        model.eval()
-        batch = tuple(t.to(args.device) for t in batch)
+    model.eval()
+    use_segment_ids = args.model_type in ['bert', 'xlnet']
+    for batch in tqdm(eval_dataloader, total=len_eval_dataset//eval_batch_size+1, desc='3.paragraph_ranking.evaluate', file=sys_stdout):
+        labels = batch[3]
+        inputs = {'input_ids':      batch[0].to(device),
+                    'attention_mask': batch[1].to(device),
+                    'token_type_ids': batch[2].to(device) if use_segment_ids else None,  # XLM don't use segment_ids
+                    'labels': labels.to(device)        }
+        del batch
+        outputs = model(**inputs)
+        del inputs
+        tmp_eval_loss, logits = outputs[:2]
 
-        with torch_no_grad():
-            inputs = {'input_ids':      batch[0],
-                      'attention_mask': batch[1],
-                      'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,  # XLM don't use segment_ids
-                      'labels':         batch[3]}
-            outputs = model(**inputs)
-            tmp_eval_loss, logits = outputs[:2]
-
-            eval_loss += tmp_eval_loss.mean().item()
+        eval_loss += tmp_eval_loss.mean().item()
 
         logits = logits.detach().cpu().numpy()
-        label_ids = inputs['labels'].detach().cpu().numpy()
+        label_ids = labels.detach().cpu().numpy()
 
         predictions.append(logits)
-        ground_truth.extend([label_id.item() for label_id in label_ids])
+        ground_truth.extend(list(label_ids))
 
         nb_eval_steps += 1
         if preds is None:
@@ -86,15 +89,16 @@ def evaluate(args, model, tokenizer, prefix=""):
             preds = np_append(preds, logits, axis=0)
             out_label_ids = np_append(out_label_ids, label_ids, axis=0)
 
-    eval_loss = eval_loss / nb_eval_steps
+    eval_loss /= nb_eval_steps
     if args.output_mode == "classification":
         preds = np_argmax(preds, axis=1)
     elif args.output_mode == "regression":
         preds = np_squeeze(preds)
 
     print("***** Writting Predictions ******")
-    logits0 = np_concatenate(predictions, axis=0)[:, 0]
-    logits1 = np_concatenate(predictions, axis=0)[:, 1]
+    logits01 = np_concatenate(predictions, axis=0)
+    logits0 = logits01[:, 0]
+    logits1 = logits01[:, 1]
     score = DataFrame({'logits0': logits0, 'logits1': logits1, 'label': ground_truth})
     return score
 
@@ -108,17 +112,18 @@ def rank_paras(data, pred_score):
     logits = np_array([pred_score['logits0'], pred_score['logits1']]).transpose()
     pred_score['prob'] = softmax(logits)[:, 1]
 
-    ranked_paras = dict()
+    ranked_paras = {}
     cur_ptr = 0
 
-    for case in tqdm(data):
+    for case in tqdm(data, desc='3_paragraph_ranking.rank_paras', file=sys_stdout):
         key = case['_id']
         tem_ptr = cur_ptr
-
+        case_context = case['context']
         all_paras = []
-        while cur_ptr < tem_ptr + len(case['context']):
+        max_len = tem_ptr + len(case_context)
+        while cur_ptr < max_len:
             score = pred_score.loc[cur_ptr, 'prob'].item()
-            all_paras.append((case['context'][cur_ptr - tem_ptr][0], score))
+            all_paras.append((case_context[cur_ptr - tem_ptr][0], score))
             cur_ptr += 1
 
         sorted_all_paras = sorted(all_paras, key=lambda x: x[1], reverse=True)
@@ -126,7 +131,7 @@ def rank_paras(data, pred_score):
 
     return ranked_paras
 
-def load_and_cache_examples(args, task, tokenizer, evaluate=False):
+def load_and_cache_examples(args, task, tokenizer, device, evaluate=False):
     processor = processors[task]()
     output_mode = output_modes[task]
 
@@ -142,13 +147,13 @@ def load_and_cache_examples(args, task, tokenizer, evaluate=False):
             pad_token_segment_id=4 if args.model_type in ['xlnet'] else 0)
 
     # Convert to Tensors and build dataset
-    all_input_ids = torch_tensor([f.input_ids for f in features], dtype=torch_long)
-    all_input_mask = torch_tensor([f.input_mask for f in features], dtype=torch_long)
-    all_segment_ids = torch_tensor([f.segment_ids for f in features], dtype=torch_long)
+    all_input_ids = torch_as_tensor([f.input_ids for f in features], dtype=torch_int64, device=device)
+    all_input_mask = torch_as_tensor([f.input_mask for f in features], dtype=torch_int64, device=device)
+    all_segment_ids = torch_as_tensor([f.segment_ids for f in features], dtype=torch_int64, device=device)
     if output_mode == "classification":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_long)
+        all_label_ids = torch_as_tensor([f.label_id for f in features], dtype=torch_int64, device=device)
     elif output_mode == "regression":
-        all_label_ids = torch_tensor([f.label_id for f in features], dtype=torch_float)
+        all_label_ids = torch_as_tensor([f.label_id for f in features], dtype=torch_float32, device=device)
 
     dataset = TensorDataset(all_input_ids, all_input_mask, all_segment_ids, all_label_ids)
 
@@ -172,11 +177,6 @@ def set_args():
                         help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(ALL_MODELS))
     parser.add_argument("--task_name", default='hotpotqa', type=str,
                         help="The name of the task to train selected in the list: " + ", ".join(processors.keys()))
-    parser.add_argument('--fp16', action='store_true',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit")
-    parser.add_argument('--fp16_opt_level', type=str, default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
     ## Other parameters
     parser.add_argument("--config_name", default="", type=str,
                         help="Pretrained config name or path if not the same as model_name")
@@ -187,10 +187,9 @@ def set_args():
                              "than this will be truncated, sequences shorter will be padded.")
     parser.add_argument("--do_lower_case", action='store_true',
                         help="Set this flag if you are using an uncased model.")
-    parser.add_argument("--no_cuda", action='store_true',
-                        help="Avoid using CUDA when available")
     parser.add_argument("--per_gpu_eval_batch_size", default=64, type=int,
                         help="Batch size per GPU/CPU for evaluation.")
+    parser.add_argument("--device_str", type=str, required=True, help="Device string. Can be either 'cuda', 'mps', or 'cpu'")
 
     args = parser.parse_args()
 
@@ -200,7 +199,20 @@ if __name__ == "__main__":
     args = set_args()
 
     # Setup CUDA
-    args.device = torch_device("cuda" if is_available() and not args.no_cuda else "cpu")
+    device_str = args.device_str
+
+    match device_str:
+        case 'cuda':
+            assert cuda_is_available()
+            print('Using CUDA')
+        case 'mps':
+            assert mps_is_available()
+            print('Using MPS')
+        case 'cpu':
+            print('Using CPU')
+        case _:
+            raise ValueError(f'Unknown device string {device_str}')
+    device = torch_device(device_str)
 
     processor = processors[args.task_name]()
     args.output_mode = output_modes[args.task_name]
@@ -211,22 +223,23 @@ if __name__ == "__main__":
     config_class, model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     config = config_class.from_pretrained(args.config_name if args.config_name else args.model_name_or_path,
                                           num_labels=num_labels,
-                                          finetuning_task=args.task_name)
+                                          finetuning_task=args.task_name,
+                                          device_map=device)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name if args.tokenizer_name else args.model_name_or_path,
-                                                do_lower_case=args.do_lower_case)
+                                                do_lower_case=args.do_lower_case, device_map=device)
 
     # Load a trained model that you have fine-tuned
-    model_state_dict = torch_load(args.eval_ckpt)
-    model = model_class.from_pretrained(args.model_name_or_path,
+    # model_state_dict = torch_load(f=args.eval_ckpt, map_location=device)
+    # model = model_class.from_pretrained(args.model_name_or_path,
+                                        # state_dict=model_state_dict,
+    model = model_class.from_pretrained(args.eval_ckpt,
                                         config=config,
-                                        state_dict=model_state_dict)
-    model.cuda()
-    if args.fp16:
-        model = initialize(model, opt_level=args.fp16_opt_level)
-
-    score = evaluate(args, model, tokenizer, prefix="")
+                                        device_map=device)
+    score = evaluate(args, model, tokenizer, device, prefix="")
 
     # load source data
-    source_data = json_load(open(args.raw_data, 'r'))
+    with open(args.raw_data, 'r') as file_in:
+        source_data = json_load(file_in)
     rank_paras_dict = rank_paras(source_data, score)
-    json_dump(rank_paras_dict, open(os_path_join(args.data_dir, 'para_ranking.json'), 'w'))
+    with open(os_path_join(args.data_dir, 'para_ranking.json'), 'w') as file_out:
+        json_dump(rank_paras_dict, file_out)

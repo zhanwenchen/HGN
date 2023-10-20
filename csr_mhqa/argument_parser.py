@@ -23,7 +23,8 @@ def boolean_string(s):
     return s_lower == 'true'
 
 def json_to_argv(json_file):
-    j = json_load(open(json_file))
+    with open(json_file, mode='r') as file_in:
+        j = json_load(file_in)
     argv = []
     for k, v in j.items():
         new_v = str(v) if v is not None else None
@@ -135,13 +136,6 @@ def default_train_parser():
                         type=boolean_string,
                         help="use data parallel or not")
     parser.add_argument("--gpu_id", default=None, type=str, help="GPU id")
-    parser.add_argument('--fp16',
-                        type=boolean_string,
-                        default='false',
-                        help="Whether to use 16-bit (mixed) precision (through NVIDIA apex) instead of 32-bit")
-    parser.add_argument('--fp16_opt_level', type=str, default='O1',
-                        help="For fp16: Apex AMP optimization level selected in ['O0', 'O1', 'O2', and 'O3']."
-                             "See details at https://nvidia.github.io/apex/amp.html")
     parser.add_argument("--local_rank", type=int, default=-1,
                         help="For distributed training: local_rank")
 
@@ -198,6 +192,7 @@ def default_train_parser():
     parser.add_argument("--para_lambda", type=float, default=1)
     parser.add_argument("--sent_lambda", type=float, default=5)
     parser.add_argument("--ent_lambda", type=float, default=1)
+    parser.add_argument("--is_missing_lambda", type=float, default=1)
     parser.add_argument("--sp_threshold", type=float, default=0.5)
 
     return parser

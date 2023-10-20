@@ -60,26 +60,20 @@ class HierarchicalGraphNetwork(Module):
         if self.q_update:
             query_vec = mean_pooling(trunc_query_state, trunc_query_mapping)
 
-        para_logits, sent_logits = [], []
-        para_predictions, sent_predictions, ent_predictions = [], [], []
 
         graph_blocks = self.graph_blocks
         for l in range(self.num_gnn_layers):
-            new_input_state, graph_state, graph_mask, sent_state, query_vec, para_logit, para_prediction, \
+            _, graph_state, graph_mask, _, query_vec, _, para_prediction, \
             sent_logit, sent_prediction, ent_logit = graph_blocks[l](batch, input_state, query_vec)
 
-            para_logits.append(para_logit)
-            sent_logits.append(sent_logit)
-            para_predictions.append(para_prediction)
-            sent_predictions.append(sent_prediction)
-            ent_predictions.append(ent_logit)
-
         input_state, _ = self.ctx_attention(input_state, graph_state, graph_mask.squeeze(-1))
-        predictions = self.predict_layer(batch, input_state, sent_logits[-1], packing_mask=query_mapping, return_yp=return_yp)
+
+        predictions = self.predict_layer(batch, input_state, sent_logit, packing_mask=query_mapping, return_yp=return_yp)
 
         if return_yp:
-            start, end, q_type, yp1, yp2 = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1], yp1, yp2
+            start, end, q_type, is_missing, yp1, yp2 = predictions
+            return start, end, q_type, para_prediction, sent_prediction, ent_logit, is_missing, yp1, yp2,
         else:
-            start, end, q_type = predictions
-            return start, end, q_type, para_predictions[-1], sent_predictions[-1], ent_predictions[-1]
+            start, end, q_type, is_missing = predictions
+            return start, end, q_type, para_prediction, sent_prediction, ent_logit, is_missing
+
