@@ -178,9 +178,9 @@ class DataIteratorPack(object):
         ent_limit = self.ent_limit
 
         # BERT input
-        context_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64)
-        context_mask = torch_empty(bsz, max_seq_length, dtype=torch_int64)
-        segment_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64)
+        context_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
+        context_mask = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
+        segment_idxs = torch_empty(bsz, max_seq_length, dtype=torch_int64, device=device)
 
         # Mappings
         query_mapping = torch_empty(bsz, max_seq_length, device=device)
