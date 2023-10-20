@@ -38,6 +38,7 @@ MODEL_CLASSES = {
 
 logger = getLogger(__name__)
 
+@torch_no_grad()
 def evaluate(args, model, tokenizer, device, prefix=""):
     # Loop to handle MNLI double evaluation (matched, mis-matched)
     eval_task = args.task_name
@@ -60,25 +61,26 @@ def evaluate(args, model, tokenizer, device, prefix=""):
     out_label_ids = None
     predictions = []
     ground_truth = []
+    model.eval()
+    use_segment_ids = args.model_type in ['bert', 'xlnet']
     for batch in tqdm(eval_dataloader, total=len_eval_dataset//eval_batch_size+1, desc='3.paragraph_ranking.evaluate', file=sys_stdout):
-        model.eval()
-        batch = tuple(t.to(args.device) for t in batch)
+        labels = batch[3]
+        inputs = {'input_ids':      batch[0].to(device),
+                    'attention_mask': batch[1].to(device),
+                    'token_type_ids': batch[2].to(device) if use_segment_ids else None,  # XLM don't use segment_ids
+                    'labels': labels.to(device)        }
+        del batch
+        outputs = model(**inputs)
+        del inputs
+        tmp_eval_loss, logits = outputs[:2]
 
-        with torch_no_grad():
-            inputs = {'input_ids':      batch[0],
-                      'attention_mask': batch[1],
-                      'token_type_ids': batch[2] if args.model_type in ['bert', 'xlnet'] else None,  # XLM don't use segment_ids
-                      'labels':         batch[3]}
-            outputs = model(**inputs)
-            tmp_eval_loss, logits = outputs[:2]
-
-            eval_loss += tmp_eval_loss.mean().item()
+        eval_loss += tmp_eval_loss.mean().item()
 
         logits = logits.detach().cpu().numpy()
-        label_ids = inputs['labels'].detach().cpu().numpy()
+        label_ids = labels.detach().cpu().numpy()
 
         predictions.append(logits)
-        ground_truth.extend([label_id.item() for label_id in label_ids])
+        ground_truth.extend(list(label_ids))
 
         nb_eval_steps += 1
         if preds is None:
