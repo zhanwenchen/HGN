@@ -46,7 +46,7 @@ def evaluate(args, model, tokenizer, device, prefix=""):
     eval_batch_size = args.per_gpu_eval_batch_size
     # Note that DistributedSampler samples randomly
     eval_sampler = SequentialSampler(eval_dataset)
-    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=args.eval_batch_size)
+    eval_dataloader = DataLoader(eval_dataset, sampler=eval_sampler, batch_size=eval_batch_size)
 
     # Eval!
     len_eval_dataset = len(eval_dataset)
