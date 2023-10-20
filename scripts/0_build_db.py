@@ -110,7 +110,7 @@ def store_contents(data_path, save_path, preprocess, num_workers=None):
         num_workers: Number of parallel processes to use when reading docs.
     """
     if os_path_isfile(save_path):
-        raise RuntimeError('%s already exists! Not overwriting.' % save_path)
+        raise RuntimeError(f'{save_path} already exists! Not overwriting.')
 
     logger.info('Reading into database...')
     conn = sqlite3_connect(save_path)

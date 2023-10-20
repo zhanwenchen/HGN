@@ -51,9 +51,9 @@ def evaluate(args, model, tokenizer, device, prefix=""):
 
     # Eval!
     len_eval_dataset = len(eval_dataset)
-    print("***** Running evaluation {} *****".format(prefix))
-    print("  Num examples = %d" % len_eval_dataset)
-    print("  Batch size = %d" % eval_batch_size)
+    print(f'***** Running evaluation {prefix} *****')
+    print(f'  Num examples = {len_eval_dataset}')
+    print(f'  Batch size = {eval_batch_size}')
 
     eval_loss = 0.0
     nb_eval_steps = 0
