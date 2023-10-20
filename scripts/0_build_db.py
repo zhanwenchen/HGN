@@ -81,16 +81,19 @@ def get_contents(filename):
             if not doc:
                 continue
             # Add the document
-            assert len(doc['text']) == len(doc['text_with_links'])
-            _text, _text_with_links = pickle_dumps(doc['text']), pickle_dumps(doc['text_with_links'])
+            doc_text = doc.pop('text')
+            doc_text_with_links = doc.pop('text_with_links')
+            len_doc_text = len(doc_text)
+            assert len_doc_text == len(doc_text_with_links)
+            _text, _text_with_links = pickle_dumps(doc_text), pickle_dumps(doc_text_with_links)
 
             _text_ner = []
-            for sent in doc['text']:
+            for sent in doc_text:
                 ent_list = [(ent.text, ent.start_char, ent.end_char, ent.label_) for ent in nlp(sent).ents]
                 _text_ner.append(ent_list)
             _text_ner_str = pickle_dumps(_text_ner)
 
-            documents.append((unicodedata_normalize('NFD', doc['id']), doc['url'], doc['title'], _text, _text_with_links, _text_ner_str, len(doc['text'])))
+            documents.append((unicodedata_normalize('NFD', doc.pop('id')), doc.pop('url'), doc.pop('title'), _text, _text_with_links, _text_ner_str, len_doc_text))
 
     return documents
 

@@ -26,9 +26,10 @@ def extract_ner_from_titles(sent, titles, context_ners=None):
                 if ent[3] in ent_type:
                     candidates.add(ent[0])
 
+    sent_lower = sent.lower()
     for title in titles:
         stripped_title = re_sub(r' \(.*?\)$', '', title)
-        start_pos = sent.lower().find(stripped_title.lower())
+        start_pos = sent_lower.find(stripped_title.lower())
         if start_pos != -1:
             end_pos = start_pos + len(stripped_title)
             # ! use title rather than the matched text in the question
@@ -36,7 +37,7 @@ def extract_ner_from_titles(sent, titles, context_ners=None):
 
     for word in candidates:
         word = re_sub(r' \(.*?\)$', '', word)
-        start_pos = sent.lower().find(word.lower())
+        start_pos = sent_lower.find(word.lower())
         if start_pos != -1:
             end_pos = start_pos + len(word)
             text = sent[start_pos: end_pos]
@@ -73,9 +74,10 @@ def extract_context_ner(full_data, ner_data=None):
     for case in full_data:
         guid = case['_id']
         context_guid2ner[guid] = []
-        titles = list(dict(case['context']).keys())
+        case_context = case['context']
+        titles = list(dict(case_context).keys())
 
-        for title, sents in case['context']:
+        for title, sents in case_context:
             context_ner = []
             for sent, sent_ner in zip(sents, ner_data[title]['text_ner']):
                 context_ner.append([])

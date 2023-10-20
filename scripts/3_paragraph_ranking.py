@@ -92,8 +92,9 @@ def evaluate(args, model, tokenizer, device, prefix=""):
         preds = np_squeeze(preds)
 
     print("***** Writting Predictions ******")
-    logits0 = np_concatenate(predictions, axis=0)[:, 0]
-    logits1 = np_concatenate(predictions, axis=0)[:, 1]
+    logits01 = np_concatenate(predictions, axis=0)
+    logits0 = logits01[:, 0]
+    logits1 = logits01[:, 1]
     score = DataFrame({'logits0': logits0, 'logits1': logits1, 'label': ground_truth})
     return score
 
@@ -113,11 +114,12 @@ def rank_paras(data, pred_score):
     for case in tqdm(data):
         key = case['_id']
         tem_ptr = cur_ptr
-
+        case_context = case['context']
         all_paras = []
-        while cur_ptr < tem_ptr + len(case['context']):
+        max_len = tem_ptr + len(case_context)
+        while cur_ptr < max_len:
             score = pred_score.loc[cur_ptr, 'prob'].item()
-            all_paras.append((case['context'][cur_ptr - tem_ptr][0], score))
+            all_paras.append((case_context[cur_ptr - tem_ptr][0], score))
             cur_ptr += 1
 
         sorted_all_paras = sorted(all_paras, key=lambda x: x[1], reverse=True)

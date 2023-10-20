@@ -31,7 +31,7 @@ class DocDB(object):
 
     def __init__(self, db_path):
         self.path = db_path
-        self.connection = sqlite3_connect(self.path, check_same_thread=False)
+        self.connection = sqlite3_connect(db_path, check_same_thread=False)
 
     def __enter__(self):
         return self
