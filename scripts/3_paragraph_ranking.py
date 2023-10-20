@@ -113,7 +113,7 @@ def rank_paras(data, pred_score):
     logits = np_array([pred_score['logits0'], pred_score['logits1']]).transpose()
     pred_score['prob'] = softmax(logits)[:, 1]
 
-    ranked_paras = dict()
+    ranked_paras = {}
     cur_ptr = 0
 
     for case in tqdm(data):

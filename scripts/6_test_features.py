@@ -17,8 +17,8 @@ from eval.hotpot_evaluate_v1 import eval as hotpot_eval
 from eval.hotpot_evaluate_v1 import normalize_answer
 
 def predict(examples, features, pred_file, tokenizer, use_ent_ans=False):
-    answer_dict = dict()
-    sp_dict = dict()
+    answer_dict = {}
+    sp_dict = {}
     ids = list(examples.keys())
 
     max_sent_num = 0
